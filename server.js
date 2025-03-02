@@ -18,8 +18,8 @@ wss.on("connection", (ws) => {
         try {
             const data = JSON.parse(message);
 
-            if (data.type === "join") {
-                if (players.length < 6) { // Limit to 6 players
+            if (data.type === "addPlayer") {
+                if (players.length < 10) { // Limit to 6 players
                     const player = { id: ws, name: data.name, chips: 1000 }; // Default chips
                     players.push(player);
                     console.log(`${data.name} joined the game.`);
