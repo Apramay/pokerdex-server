@@ -42,4 +42,5 @@ function broadcast(data) {
     });
 }
 
-server.listen(3000, () => console.log("WebSocket server running on port 3000"));
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => console.log(`WebSocket server running on port ${PORT}`));
