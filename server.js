@@ -18,9 +18,11 @@ wss.on("connection", (ws) => {
         try {
             const data = JSON.parse(message);
 
-            if (data.type === "addPlayer") {
+            if (data.type === "join" || data.type === "addPlayer") {
+
                 if (players.length < 10) { // Limit to 6 players
-                    const player = { id: ws, name: data.name, chips: 1000 }; // Default chips
+                    const player = { id: Date.now(), name: data.name, chips: 1000 };
+
                     players.push(player);
                     console.log(`${data.name} joined the game.`);
 
@@ -44,13 +46,12 @@ wss.on("connection", (ws) => {
         }
     });
 
-    ws.on("close", () => {
-        players = players.filter(p => p.id !== ws);
-        console.log("A player disconnected.");
+  ws.on("close", () => {
+    players = players.filter(p => p.id !== ws.id);
+    console.log("A player disconnected.");
+    broadcast({ type: "updatePlayers", players: players.map(p => p.name) });
+});
 
-        // Broadcast updated player list
-        broadcast({ type: "players", players: players.map(p => p.name) });
-    });
 });
 
 function broadcast(data) {
