@@ -28,7 +28,7 @@ wss.on("connection", (ws) => {
                     ws.send(JSON.stringify({ type: "welcome", message: `Welcome, ${data.name}!` }));
 
                     // Broadcast updated player list
-                    broadcast({ type: "players", players: players.map(p => p.name) });
+                    broadcast({ type: "updatePlayers", players });
                 } else {
                     ws.send(JSON.stringify({ type: "error", message: "Game is full!" }));
                 }
