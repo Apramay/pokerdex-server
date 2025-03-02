@@ -15,13 +15,32 @@ wss.on("connection", (ws) => {
     console.log("New player connected");
 
     ws.on("message", (message) => {
-        const data = JSON.parse(message);
-        if (data.type === "join") {
-            players.push({ id: ws, name: data.name });
-            console.log(`${data.name} joined the game.`);
+        try {
+            const data = JSON.parse(message);
 
-            // Broadcast updated player list
-            broadcast({ type: "players", players: players.map(p => p.name) });
+            if (data.type === "join") {
+                if (players.length < 6) { // Limit to 6 players
+                    const player = { id: ws, name: data.name, chips: 1000 }; // Default chips
+                    players.push(player);
+                    console.log(`${data.name} joined the game.`);
+
+                    // Send welcome message
+                    ws.send(JSON.stringify({ type: "welcome", message: `Welcome, ${data.name}!` }));
+
+                    // Broadcast updated player list
+                    broadcast({ type: "players", players: players.map(p => p.name) });
+                } else {
+                    ws.send(JSON.stringify({ type: "error", message: "Game is full!" }));
+                }
+            }
+
+            // Handle game moves (bet, fold, check)
+            if (data.type === "move") {
+                console.log(`${data.name} made a move: ${data.move}`);
+                broadcast({ type: "move", player: data.name, move: data.move, amount: data.amount });
+            }
+        } catch (err) {
+            console.error("Error processing message:", err);
         }
     });
 
