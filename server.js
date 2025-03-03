@@ -9,7 +9,7 @@ app.use(cors());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-let players = []; // Persist players globally
+let players = []; // Global players list
 
 function broadcastPlayers() {
     const payload = JSON.stringify({ type: "updatePlayers", players });
@@ -21,7 +21,7 @@ function broadcastPlayers() {
 }
 
 wss.on("connection", (ws) => {
-    console.log("New player connected");
+    console.log("New WebSocket connection established.");
 
     ws.on("message", (message) => {
         try {
@@ -29,13 +29,17 @@ wss.on("connection", (ws) => {
 
             if (data.type === "join") {
                 console.log(`Player joined: ${data.name}`);
-                players.push({ name: data.name, chips: 1000 }); // Add player with default chips
-                broadcastPlayers(); // Notify all clients
+                
+                // Check if player already exists
+                if (!players.find(player => player.name === data.name)) {
+                    players.push({ name: data.name, chips: 1000, ws });
+                    broadcastPlayers();
+                }
             }
 
             if (data.type === "move") {
                 console.log(`Player Move: ${data.name} ${data.move} ${data.amount}`);
-                // Handle moves like betting (update logic if needed)
+                // Handle bet/move logic
             }
         } catch (error) {
             console.error("Invalid message format:", message);
@@ -44,8 +48,8 @@ wss.on("connection", (ws) => {
 
     ws.on("close", () => {
         console.log("A player disconnected.");
-        players = players.filter(player => player.ws !== ws); // Remove player on disconnect
-        broadcastPlayers(); // Notify all clients
+        players = players.filter(player => player.ws !== ws); // Remove the player
+        broadcastPlayers(); // Update all clients
     });
 });
 
