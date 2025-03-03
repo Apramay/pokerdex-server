@@ -9,43 +9,44 @@ app.use(cors());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-let players = [];
+let players = []; // Persist players globally
 
-wss.on("connection", (ws) => {
-    console.log("🟢 New player connected");
-
-    ws.on("message", (message) => {
-        try {
-            const data = JSON.parse(message);
-            console.log("📩 Received message from client:", data);
-
-            if (data.type === "join") {
-                const newPlayer = { id: Date.now(), name: data.name, chips: 1000 };
-                players.push(newPlayer);
-                console.log("👥 Updated players list:", players);
-
-                broadcast({ type: "updatePlayers", players });
-            }
-        } catch (error) {
-            console.error("❌ Error parsing message:", error);
-        }
-    });
-
-    ws.on("close", () => {
-        console.log("🔴 A player disconnected");
-    });
-});
-
-// Function to send updates to all connected clients
-function broadcast(data) {
+function broadcastPlayers() {
+    const payload = JSON.stringify({ type: "updatePlayers", players });
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(data));
+            client.send(payload);
         }
     });
 }
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+wss.on("connection", (ws) => {
+    console.log("New player connected");
+
+    ws.on("message", (message) => {
+        try {
+            const data = JSON.parse(message);
+
+            if (data.type === "join") {
+                console.log(`Player joined: ${data.name}`);
+                players.push({ name: data.name, chips: 1000 }); // Add player with default chips
+                broadcastPlayers(); // Notify all clients
+            }
+
+            if (data.type === "move") {
+                console.log(`Player Move: ${data.name} ${data.move} ${data.amount}`);
+                // Handle moves like betting (update logic if needed)
+            }
+        } catch (error) {
+            console.error("Invalid message format:", message);
+        }
+    });
+
+    ws.on("close", () => {
+        console.log("A player disconnected.");
+        players = players.filter(player => player.ws !== ws); // Remove player on disconnect
+        broadcastPlayers(); // Notify all clients
+    });
 });
+
+server.listen(3000, () => console.log("Server running on port 3000"));
