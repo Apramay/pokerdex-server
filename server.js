@@ -14,7 +14,7 @@ let players = []; // ✅ Ensure players are stored persistently in memory
 wss.on("connection", (ws) => {
     console.log("✅ New player connected");
 
-    // ✅ Immediately send the latest players list to the new connection
+    // Send the latest players list to the new connection
     ws.send(JSON.stringify({ type: "updatePlayers", players }));
 
     ws.on("message", (message) => {
@@ -24,13 +24,20 @@ wss.on("connection", (ws) => {
             if (data.type === "join") {
                 console.log(`👤 Player joined: ${data.name}`);
 
-                // ✅ Prevent duplicates
+                // Prevent duplicates
                 if (!players.some(player => player.name === data.name)) {
                     players.push({ name: data.name, chips: 1000 });
 
-                    // ✅ Broadcast updated players list to ALL clients
+                    // Broadcast updated players list to ALL clients
                     broadcast({ type: "updatePlayers", players });
                 }
+            }
+
+            if (data.type === "startGame") {
+                console.log("🎲 Game started!");
+
+                // Broadcast the game start event to ALL clients
+                broadcast({ type: "startGame", players });
             }
         } catch (error) {
             console.error("❌ Error handling message:", error);
@@ -39,11 +46,9 @@ wss.on("connection", (ws) => {
 
     ws.on("close", () => {
         console.log("🚪 A player disconnected");
-                players = players.filter(player => player.ws !== ws);
-
-        broadcast({ type: "updatePlayers", players });
     });
 });
+
 
 // ✅ Broadcast function ensures all players receive updates
 function broadcast(data) {
