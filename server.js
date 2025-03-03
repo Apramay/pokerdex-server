@@ -12,9 +12,9 @@ const wss = new WebSocket.Server({ server });
 let players = [];
 
 wss.on("connection", (ws) => {
-    console.log("✅ New player connected");
+    console.log("✅ New WebSocket connection established");
 
-    // Send the current players list to the new player
+    // Send the current players list to the new client
     ws.send(JSON.stringify({ type: "updatePlayers", players }));
 
     ws.on("message", (message) => {
@@ -27,10 +27,10 @@ wss.on("connection", (ws) => {
                 // Check if the player already exists (avoid duplicates)
                 if (!players.some(player => player.name === data.name)) {
                     players.push({ name: data.name, chips: 1000 });
-                }
 
-                // Broadcast updated players list to ALL clients
-                broadcast({ type: "updatePlayers", players });
+                    // Broadcast updated players list to ALL clients
+                    broadcast({ type: "updatePlayers", players });
+                }
             }
         } catch (error) {
             console.error("❌ Error handling message:", error);
