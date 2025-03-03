@@ -37,8 +37,14 @@ wss.on("connection", (ws) => {
         }
     });
 
-    ws.on("close", () => {
+     ws.on("close", () => {
         console.log("🚪 A player disconnected");
+
+        // Find and remove the disconnected player
+        players = players.filter(player => player.ws !== ws);
+
+        // Broadcast updated player list
+        broadcast({ type: "updatePlayers", players.map(p => ({ name: p.name, chips: p.chips })) });
     });
 });
 
