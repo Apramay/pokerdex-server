@@ -9,12 +9,12 @@ app.use(cors());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-let players = []; // Keep players list even when no one is connected
+let players = []; // ✅ Ensure players are stored persistently in memory
 
 wss.on("connection", (ws) => {
     console.log("✅ New player connected");
 
-    // Send the latest players list immediately when a new client connects
+    // ✅ Immediately send the latest players list to the new connection
     ws.send(JSON.stringify({ type: "updatePlayers", players }));
 
     ws.on("message", (message) => {
@@ -24,13 +24,13 @@ wss.on("connection", (ws) => {
             if (data.type === "join") {
                 console.log(`👤 Player joined: ${data.name}`);
 
-                // Prevent duplicate players
+                // ✅ Prevent duplicates
                 if (!players.some(player => player.name === data.name)) {
                     players.push({ name: data.name, chips: 1000 });
-                }
 
-                // Broadcast updated players list to ALL clients
-                broadcast({ type: "updatePlayers", players });
+                    // ✅ Broadcast updated players list to ALL clients
+                    broadcast({ type: "updatePlayers", players });
+                }
             }
         } catch (error) {
             console.error("❌ Error handling message:", error);
@@ -42,7 +42,7 @@ wss.on("connection", (ws) => {
     });
 });
 
-// Function to send data to all players
+// ✅ Broadcast function ensures all players receive updates
 function broadcast(data) {
     const jsonData = JSON.stringify(data);
     console.log("📢 Broadcasting to all players:", jsonData);
