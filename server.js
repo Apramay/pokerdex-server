@@ -39,6 +39,9 @@ wss.on("connection", (ws) => {
 
     ws.on("close", () => {
         console.log("🚪 A player disconnected");
+                players = players.filter(player => player.ws !== ws);
+
+        broadcast({ type: "updatePlayers", players });
     });
 });
 
