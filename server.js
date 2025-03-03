@@ -9,42 +9,47 @@ app.use(cors());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-let players = []; // Store connected players
+let players = [];
 
 wss.on("connection", (ws) => {
     console.log("✅ New player connected");
 
-    ws.on("message", (message) => {
-        console.log("📩 Received message:", message);
+    // Send the current players list to the new player
+    ws.send(JSON.stringify({ type: "updatePlayers", players }));
 
+    ws.on("message", (message) => {
         try {
             const data = JSON.parse(message);
 
             if (data.type === "join") {
                 console.log(`👤 Player joined: ${data.name}`);
 
-                // Add player to list
-                players.push({ name: data.name, chips: 1000 });
+                // Check if the player already exists (avoid duplicates)
+                if (!players.some(player => player.name === data.name)) {
+                    players.push({ name: data.name, chips: 1000 });
+                }
 
-                // Broadcast updated players list to all clients
-                broadcastPlayers();
+                // Broadcast updated players list to ALL clients
+                broadcast({ type: "updatePlayers", players });
             }
         } catch (error) {
-            console.error("❌ Error parsing message:", error);
+            console.error("❌ Error handling message:", error);
         }
     });
 
     ws.on("close", () => {
-        console.log("❌ A player disconnected");
+        console.log("🚪 A player disconnected");
     });
 });
 
-// Function to send updated player list
-function broadcastPlayers() {
-    const update = JSON.stringify({ type: "updatePlayers", players });
+// Function to send data to all players
+function broadcast(data) {
+    const jsonData = JSON.stringify(data);
+    console.log("📢 Broadcasting to all players:", jsonData);
+
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
-            client.send(update);
+            client.send(jsonData);
         }
     });
 }
