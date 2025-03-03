@@ -19,22 +19,19 @@ wss.on("connection", (ws) => {
             const data = JSON.parse(message);
 
             if (data.type === "join" || data.type === "addPlayer") {
+    if (players.length < 10) { // Limit to 10 players
+        const player = { id: Date.now(), name: data.name, chips: 1000, ws };
+        players.push(player); // Store WebSocket reference
+        console.log(`${data.name} joined the game.`);
 
-                if (players.length < 10) { // Limit to 6 players
-                    const player = { id: Date.now(), name: data.name, chips: 1000 };
+        ws.send(JSON.stringify({ type: "welcome", message: `Welcome, ${data.name}!` }));
+        broadcast({ type: "updatePlayers", players });
+    } else {
+        ws.send(JSON.stringify({ type: "error", message: "Game is full!" }));
+    }
+}
 
-                    players.push(player);
-                    console.log(`${data.name} joined the game.`);
-
-                    // Send welcome message
-                    ws.send(JSON.stringify({ type: "welcome", message: `Welcome, ${data.name}!` }));
-
-                    // Broadcast updated player list
-                    broadcast({ type: "updatePlayers", players });
-                } else {
-                    ws.send(JSON.stringify({ type: "error", message: "Game is full!" }));
-                }
-            }
+            
 
             // Handle game moves (bet, fold, check)
             if (data.type === "move") {
@@ -46,11 +43,12 @@ wss.on("connection", (ws) => {
         }
     });
 
-  ws.on("close", () => {
-    players = players.filter(p => p.id !== ws.id);
+ ws.on("close", () => {
+    players = players.filter(p => p.ws !== ws); // Use the WebSocket object reference
     console.log("A player disconnected.");
-    broadcast({ type: "updatePlayers", players: players.map(p => p.name) });
+    broadcast({ type: "updatePlayers", players });
 });
+
 
 });
 
