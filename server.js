@@ -15,7 +15,7 @@ wss.on("connection", (ws) => {
     console.log("✅ New player connected");
 
     // ✅ Immediately send the latest players list to the new connection
-    ws.send(JSON.stringify({ type: "updatePlayers", players }));
+    ws.send(JSON.stringify({ type: "updatePlayers", players.map(p => ({ name: p.name, chips: p.chips })) }));
 
     ws.on("message", (message) => {
         try {
@@ -26,27 +26,28 @@ wss.on("connection", (ws) => {
 
                 // ✅ Prevent duplicates
                 if (!players.some(player => player.name === data.name)) {
-                    players.push({ name: data.name, chips: 1000 });
-
-                    // ✅ Broadcast updated players list to ALL clients
-                    broadcast({ type: "updatePlayers", players });
+                    players.push({ name: data.name, chips: 1000, ws }); // ✅ Store WebSocket
                 }
+
+                // ✅ Broadcast updated players list to ALL clients
+                broadcast({ type: "updatePlayers", players.map(p => ({ name: p.name, chips: p.chips })) });
             }
         } catch (error) {
             console.error("❌ Error handling message:", error);
         }
     });
 
-     ws.on("close", () => {
+    ws.on("close", () => {
         console.log("🚪 A player disconnected");
 
-        // Find and remove the disconnected player
+        // ✅ Find and remove the disconnected player
         players = players.filter(player => player.ws !== ws);
 
-        // Broadcast updated player list
+        // ✅ Broadcast updated player list
         broadcast({ type: "updatePlayers", players.map(p => ({ name: p.name, chips: p.chips })) });
     });
 });
+
 
 // ✅ Broadcast function ensures all players receive updates
 function broadcast(data) {
