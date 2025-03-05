@@ -17,10 +17,11 @@ const rankValues = {
 };
 
 // Game state variables
-let players =0;
-let tableCards =0;
+let players = [];
+let tableCards = [];
 let pot = 0;
-let deckForGame =;
+let currentPlayerIndex = 0;
+let deckForGame = [];
 let currentBet = 0;
 let dealerIndex = 0;
 let round = 0;
