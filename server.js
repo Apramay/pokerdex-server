@@ -229,6 +229,8 @@ function getNextPlayerIndex(currentIndex) {
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
 
+    currentPlayerIndex = (dealerIndex + 1) % players.length; // Set starting player
+
     currentBet = 0;
     players.forEach(player => player.currentBet = 0);
     playersWhoActed.clear();
@@ -239,11 +241,11 @@ function nextRound() {
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(tableCards)}` });
     } else if (round === 1) {
         round = 2;
-        tableCards.push(dealCard(deckForGame)); // Turn
+        tableCards.push(dealHand(deckForGame, 1)[0]); // Turn
         broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
     } else if (round === 2) {
         round = 3;
-        tableCards.push(dealCard(deckForGame)); // River
+        tableCards.push(dealHand(deckForGame, 1)[0]); // River
         broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
     } else if (round === 3) {
         showdown();
@@ -251,10 +253,8 @@ function nextRound() {
     }
 
     broadcastGameState();
-    setTimeout(bettingRound, 1000); // Fix: Start betting round properly
+    setTimeout(bettingRound, 1000);
 }
-
-
 
 function showdown() {
     console.log("Showdown!");
