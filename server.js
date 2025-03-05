@@ -103,14 +103,20 @@ function setupBlinds() {
     postBlind(players[bigBlindIndex], bigBlindAmount);
 
     currentBet = bigBlindAmount;
-
-    // Start with Under The Gun (UTG), which is the player after the big blind
     currentPlayerIndex = (bigBlindIndex + 1) % players.length;
 
-    playersWhoActed.clear(); // Reset players who acted
+    playersWhoActed.clear();
+    
+    // NEW FIX: Allow big blind to check if no one raises
+    if (playersWhoActed.size === 0) {
+        console.log(`${players[bigBlindIndex].name} can check.`);
+        broadcast({ type: "bigBlindCheck", playerName: players[bigBlindIndex].name });
+    }
+
     broadcastGameState();
     setTimeout(bettingRound, 500);
 }
+
 
 // Function to post blinds
 function postBlind(player, amount) {
@@ -182,16 +188,24 @@ function isBettingRoundOver() {
 
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
+
     if (activePlayers.length <= 1) {
-        nextRound();
+        nextRound(); // If only one player remains, move to next round
         return -1;
     }
+
     let nextIndex = (currentIndex + 1) % players.length;
-    while (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0) {
+    while (
+        players[nextIndex].status !== "active" || 
+        players[nextIndex].tokens === 0 || 
+        players[nextIndex].allIn
+    ) {
         nextIndex = (nextIndex + 1) % players.length;
+        if (nextIndex === currentIndex) return -1; // Avoid infinite loop
     }
     return nextIndex;
 }
+
 
 
 function nextRound() {
@@ -203,10 +217,10 @@ function nextRound() {
 
     if (round === 0) {
         round = 1;
-        tableCards = dealHand(deckForGame, 3);
+        tableCards = dealHand(deckForGame, 3); // Flop
     } else if (round === 1 || round === 2) {
         round++;
-        tableCards.push(dealCard(deckForGame));
+        tableCards.push(dealCard(deckForGame)); // Turn or River
     } else if (round === 3) {
         showdown();
         return;
@@ -216,6 +230,7 @@ function nextRound() {
     currentPlayerIndex = getNextPlayerIndex((dealerIndex + 1) % players.length);
     setTimeout(bettingRound, 500);
 }
+
 
 function showdown() {
     console.log("Showdown!");
