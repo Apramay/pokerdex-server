@@ -17,8 +17,8 @@ const rankValues = {
 };
 
 // Game state variables
-let players =;
-let tableCards =;
+let players =0;
+let tableCards =0;
 let pot = 0;
 let deckForGame =;
 let currentBet = 0;
