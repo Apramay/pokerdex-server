@@ -27,7 +27,6 @@ let dealerIndex = 0;
 let round = 0;
 let smallBlindAmount = 10;
 let bigBlindAmount = 20;
-let currentPlayerIndex = 0;
 let playersWhoActed = new Set();
 
 // Function to create a new deck of cards
