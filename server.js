@@ -86,7 +86,7 @@ function startNewHand() {
         player.status = "active";
         player.allIn = false;
     });
-    tableCards =;
+    tableCards = [];
     pot = 0;
     currentBet = 0;
     round = 0;
@@ -126,7 +126,7 @@ function postBlind(player, amount) {
 
 // Function to deal a hand of cards to a player
 function dealHand(deck, numCards) {
-    const hand =;
+    const hand =[];
     for (let i = 0; i < numCards; i++) {
         hand.push(deck.pop());
     }
