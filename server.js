@@ -143,7 +143,7 @@ function check(playerName) {
 
 wss.on("connection", (ws) => {
     console.log("✅ New player connected");
-    ws.send(JSON.stringify({ type: "updatePlayers", players.map(({ ws, ...player }) => player) }));
+    ws.send(JSON.stringify({ type: "updatePlayers", players }));
 
     ws.on("message", (message) => {
         try {
