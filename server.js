@@ -251,7 +251,7 @@ function nextRound() {
     }
 
     broadcastGameState();
-    setTimeout(startFlopBetting, 1000); // Fix: Start betting round properly
+    setTimeout(bettingRound, 1000); // Fix: Start betting round properly
 }
 
 
