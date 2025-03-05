@@ -66,6 +66,26 @@ let smallBlindAmount = 10;
 let bigBlindAmount = 20;
 let dealerIndex = 0;
 
+function broadcast(data) {
+    const jsonData = JSON.stringify(data);
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(jsonData);
+        }
+    });
+}
+function broadcastGameState() {
+    broadcast({
+        type: "updateGameState",
+        players,
+        tableCards,
+        pot,
+        currentBet,
+        round,
+        currentPlayerIndex
+    });
+}
+
 function createPlayer(name, tokens) {
     return { name: name, tokens: tokens, hand: [], currentBet: 0, status: "active", allIn: false };
 }
@@ -280,60 +300,87 @@ function handleAction(action) {
 }
 
 
-function fold(player) {
+function fold(playerName) {
+    let player = players.find(p => p.name === playerName);
+    if (!player) return;
+
     player.status = "folded";
-    displayMessage(`${player.name} folds.`);
+    broadcastGameState();
+    nextPlayerTurn();
 }
 
-function call(player) {
-    let amount = Math.min(currentBet - player.currentBet, player.tokens);
+function call(playerName) {
+    let player = players.find(p => p.name === playerName);
+    if (!player) return;
+
+    let amount = currentBet - player.currentBet;
+    if (amount > player.tokens) amount = player.tokens;
+
     player.tokens -= amount;
     player.currentBet += amount;
     pot += amount;
-    displayMessage(`${player.name} calls.`);
-    if (player.tokens === 0) {
-        player.allIn = true;
-    }
+
+    broadcastGameState();
+    nextPlayerTurn();
 }
 
-function bet(player, amount) {
-    if (amount > player.tokens || amount < currentBet) {
-        displayMessage("Invalid bet");
-        return;
-    }
+
+function bet(playerName, amount) {
+    let player = players.find(p => p.name === playerName);
+    if (!player || player.tokens < amount || amount < currentBet) return;
+
     player.tokens -= amount;
     pot += amount;
     player.currentBet = amount;
     currentBet = amount;
-    displayMessage(`${player.name} bets ${amount}.`);
-    if (player.tokens === 0) {
-        player.allIn = true;
-    }
+    
+    broadcastGameState();
+    nextPlayerTurn();
 }
 
-function raise(player, amount) {
-    if (amount <= currentBet || amount > player.tokens) {
-        displayMessage("Invalid raise");
-        return;
-    }
-    const totalBet = amount;
-    player.tokens -= totalBet - player.currentBet;
-    pot += totalBet - player.currentBet;
-    player.currentBet = totalBet;
-    currentBet = totalBet;
-    displayMessage(`${player.name} raises to ${totalBet}.`);
-    if (player.tokens === 0) {
-        player.allIn = true;
-    }
+
+function raise(playerName, amount) {
+    let player = players.find(p => p.name === playerName);
+    if (!player || player.tokens < amount || amount <= currentBet) return;
+
+    player.tokens -= amount;
+    pot += amount;
+    currentBet = amount;
+    player.currentBet = amount;
+
+    broadcastGameState();
+    nextPlayerTurn();
 }
 
-function check(player) {
-    if (currentBet === 0 || player.currentBet === currentBet) {
-        displayMessage(`${player.name} checks.`);
+
+function check(playerName) {
+    let player = players.find(p => p.name === playerName);
+    if (!player || currentBet > 0) return;
+
+    broadcastGameState();
+    nextPlayerTurn();
+}
+function nextPlayerTurn() {
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+    if (currentPlayerIndex === -1) {
+        nextRound();
     } else {
-        displayMessage("You cannot check when there is a bet.");
+        broadcastGameState();
     }
 }
+function getNextPlayerIndex(currentIndex) {
+    let nextIndex = (currentIndex + 1) % players.length;
+    let attempts = 0;
+    while ((players[nextIndex].status !== "active" || players[nextIndex].tokens === 0) && attempts < players.length) {
+        if (nextIndex === currentIndex) {
+            return -1;
+        }
+        nextIndex = (nextIndex + 1) % players.length;
+        attempts++;
+    }
+    return nextIndex;
+}
+
 
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
@@ -678,7 +725,7 @@ restartBtn.onclick = function(){
 };
 wss.on("connection", (ws) => {
     console.log("✅ New player connected");
-    ws.send(JSON.stringify({ type: "updatePlayers", players }));
+    ws.send(JSON.stringify({ type: "updatePlayers", players.map(({ ws, ...player }) => player) }));
 
     ws.on("message", (message) => {
         try {
@@ -686,13 +733,37 @@ wss.on("connection", (ws) => {
 
             if (data.type === "join") {
                 if (!players.some(player => player.name === data.name)) {
-                    players.push(createPlayer(data.name, 1000));
-                    broadcast({ type: "updatePlayers", players });
+                    players.push({ name: data.name, tokens: 1000, status: "active", currentBet: 0, ws });
+                    broadcast({ type: "updatePlayers", players.map(({ ws, ...player }) => player) });
                 }
             }
 
             if (data.type === "startGame") {
                 startGame();
+            }
+
+            if (data.type === "bet") {
+                bet(data.name, data.amount);
+            }
+
+            if (data.type === "raise") {
+                raise(data.name, data.amount);
+            }
+
+            if (data.type === "call") {
+                call(data.name);
+            }
+
+            if (data.type === "fold") {
+                fold(data.name);
+            }
+
+            if (data.type === "check") {
+                check(data.name);
+            }
+
+            if (data.type === "nextRound") {
+                nextRound();
             }
         } catch (error) {
             console.error("❌ Error handling message:", error);
@@ -701,6 +772,12 @@ wss.on("connection", (ws) => {
 
     ws.on("close", () => {
         console.log("🚪 A player disconnected");
+        players = players.filter(player => player.ws !== ws);
+        if (players.length === 1) {
+            console.log(`${players[0].name} wins by default!`);
+            resetGame();
+        }
+        broadcastGameState();
     });
 });
 
