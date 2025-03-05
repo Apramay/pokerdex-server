@@ -572,14 +572,21 @@ function handleCheck(data) {
     }
 
     if (currentBet === 0 || player.currentBet === currentBet) {
-        // Move to the next player
+        console.log(`${player.name} checked.`);
+        playersWhoActed.add(player.name); // ✅ Mark player as having acted
+
+        // ✅ Move to the next player
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
-        // Broadcast the updated game state
-        broadcastGameState();
+        if (isBettingRoundOver()) {
+            console.log("All players have checked/called. Moving to next round.");
+            setTimeout(nextRound, 1000);
+        } else {
+            console.log(`Next player: ${players[currentPlayerIndex].name}`);
+            broadcastGameState();
+        }
     } else {
-        // You cannot check when there is a bet.
-        // You might want to send an error message back to the client here.
+        console.log("Check not allowed, there is a bet to match.");
     }
 }
 
