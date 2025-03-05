@@ -173,10 +173,12 @@ function bettingRound() {
 
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
+    if (activePlayers.length <= 1) return true;
 
-    if (activePlayers.length <= 1) {
-        return true; // If only one player remains, the round ends.
-    }
+    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
+    return allCalled;
+}
+
 
     // Ensure all active players have matched the current bet
     const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
@@ -190,17 +192,18 @@ function isBettingRoundOver() {
 }
 
 function getNextPlayerIndex(currentIndex) {
+    let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
+    if (activePlayers.length <= 1) {
+        nextRound();
+        return -1;
+    }
     let nextIndex = (currentIndex + 1) % players.length;
-    let attempts = 0;
-    while ((players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) && attempts < players.length) {
-        if (nextIndex === currentIndex) {
-            return -1;
-        }
+    while (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0) {
         nextIndex = (nextIndex + 1) % players.length;
-        attempts++;
     }
     return nextIndex;
 }
+
 
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
@@ -238,26 +241,34 @@ function showdown() {
 
 function distributePot() {
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
-    let winners = determineWinners(activePlayers);
+    activePlayers.sort((a, b) => a.currentBet - b.currentBet);
 
-    if (winners.length === 0) {
-        console.log("No winners found.");
-        return;
+    let remainingPot = pot;
+    let sidePots = [];
+    while (activePlayers.length > 0) {
+        const minBet = activePlayers[0].currentBet;
+        let potPortion = 0;
+
+        activePlayers.forEach(player => {
+            potPortion += Math.min(minBet, player.currentBet);
+            player.currentBet -= Math.min(minBet, player.currentBet);
+        });
+
+        sidePots.push({ players: [...activePlayers], amount: potPortion });
+        activePlayers = activePlayers.filter(p => p.currentBet > 0);
     }
 
-    const potShare = Math.floor(pot / winners.length);
-    let remainder = pot % winners.length;
-
-    winners.forEach((winner, index) => {
-        winner.tokens += potShare;
-        if (index < remainder) {
-            winner.tokens += 1; // Distribute the remainder
-        }
-        console.log(`${winner.name} receives ${potShare + (index < remainder ? 1 : 0)} tokens.`);
+    sidePots.forEach(sidePot => {
+        let winners = determineWinners(sidePot.players);
+        let splitPot = Math.floor(sidePot.amount / winners.length);
+        winners.forEach(winner => {
+            winner.tokens += splitPot;
+        });
     });
 
-    pot = 0; // Reset the pot
+    pot = 0;
 }
+
 
 function determineWinners(playerList) {
     if (playerList.length === 0) {
