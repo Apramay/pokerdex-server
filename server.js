@@ -59,7 +59,7 @@ function broadcastGameState() {
         pot,
         currentBet,
         round,
-        currentPlayerIndex
+        currentPlayerIndex,
         dealerIndex: dealerIndex
     });
 }
