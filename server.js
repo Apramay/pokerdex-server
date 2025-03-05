@@ -259,7 +259,7 @@ function determineWinners(playerList) {
     }
 
     let bestHandValue = -1;
-    let winners =;
+    let winners = [];
 
     playerList.forEach(player => {
         if (player.status !== "folded") {
