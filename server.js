@@ -180,17 +180,6 @@ function isBettingRoundOver() {
 }
 
 
-    // Ensure all active players have matched the current bet
-    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
-
-    // If all active players have called or folded, the round is over
-    if (allCalled && playersWhoActed.size >= activePlayers.length) {
-        return true;
-    }
-
-    return false;
-}
-
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
     if (activePlayers.length <= 1) {
