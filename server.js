@@ -150,9 +150,14 @@ wss.on("connection", (ws) => {
             const data = JSON.parse(message);
 
             if (data.type === "join") {
+                console.log(`👤 Player joined: ${data.name}`);
+
+                // Prevent duplicates
                 if (!players.some(player => player.name === data.name)) {
-                    players.push({ name: data.name, tokens: 1000, status: "active", currentBet: 0, ws });
-                    broadcastGameState();
+                    players.push({ name: data.name, chips: 1000 });
+
+                    // Broadcast updated players list to ALL clients
+                    broadcast({ type: "updatePlayers", players });
                 }
             }
 
