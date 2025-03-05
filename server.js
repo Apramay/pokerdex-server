@@ -206,8 +206,6 @@ function getNextPlayerIndex(currentIndex) {
     return nextIndex;
 }
 
-
-
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
 
@@ -218,18 +216,24 @@ function nextRound() {
     if (round === 0) {
         round = 1;
         tableCards = dealHand(deckForGame, 3); // Flop
-    } else if (round === 1 || round === 2) {
-        round++;
-        tableCards.push(dealCard(deckForGame)); // Turn or River
+        broadcast({ type: "message", text: `Flop: ${JSON.stringify(tableCards)}` });
+    } else if (round === 1) {
+        round = 2;
+        tableCards.push(dealCard(deckForGame)); // Turn
+        broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
+    } else if (round === 2) {
+        round = 3;
+        tableCards.push(dealCard(deckForGame)); // River
+        broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
     } else if (round === 3) {
         showdown();
         return;
     }
 
     broadcastGameState();
-    currentPlayerIndex = getNextPlayerIndex((dealerIndex + 1) % players.length);
-    setTimeout(bettingRound, 500);
+    setTimeout(startFlopBetting, 1000); // Fix: Start betting round properly
 }
+
 
 
 function showdown() {
