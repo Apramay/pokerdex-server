@@ -104,18 +104,21 @@ function setupBlinds() {
 
     currentBet = bigBlindAmount;
     currentPlayerIndex = (bigBlindIndex + 1) % players.length;
-
-    playersWhoActed.clear();
     
-    // NEW FIX: Allow big blind to check if no one raises
-    if (playersWhoActed.size === 0) {
-        console.log(`${players[bigBlindIndex].name} can check.`);
-        broadcast({ type: "bigBlindCheck", playerName: players[bigBlindIndex].name });
-    }
+    playersWhoActed.clear();
+
+    // ✅ FIX: Allow big blind to check if no one raises
+    setTimeout(() => {
+        if (currentBet === bigBlindAmount) {
+            console.log(`${players[bigBlindIndex].name} can check.`);
+            broadcast({ type: "bigBlindCanCheck", playerName: players[bigBlindIndex].name });
+        }
+    }, 1000);
 
     broadcastGameState();
     setTimeout(bettingRound, 500);
 }
+
 
 
 // Function to post blinds
@@ -185,7 +188,6 @@ function isBettingRoundOver() {
     return allCalled;
 }
 
-
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
 
@@ -195,16 +197,23 @@ function getNextPlayerIndex(currentIndex) {
     }
 
     let nextIndex = (currentIndex + 1) % players.length;
+    let attempts = 0;
+
+    // ✅ FIX: Skip players who ALREADY MATCHED the current bet
     while (
-        players[nextIndex].status !== "active" || 
+        (players[nextIndex].status !== "active" || 
         players[nextIndex].tokens === 0 || 
-        players[nextIndex].allIn
+        players[nextIndex].allIn || 
+        players[nextIndex].currentBet === currentBet) 
+        && attempts < players.length
     ) {
         nextIndex = (nextIndex + 1) % players.length;
-        if (nextIndex === currentIndex) return -1; // Avoid infinite loop
+        attempts++;
     }
+
     return nextIndex;
 }
+
 
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
