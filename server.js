@@ -60,6 +60,7 @@ function broadcastGameState() {
         currentBet,
         round,
         currentPlayerIndex
+        dealerIndex: dealerIndex
     });
 }
 
