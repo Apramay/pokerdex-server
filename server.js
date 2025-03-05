@@ -64,6 +64,7 @@ function startGame() {
     deckForGame = deckForGame.sort(() => Math.random() - 0.5);
     dealerIndex = Math.floor(Math.random() * players.length);
     startNewHand();
+    broadcast({ type: "startGame" });
     broadcastGameState();
 }
 
@@ -91,7 +92,7 @@ function bet(playerName, amount) {
     pot += amount;
     player.currentBet = amount;
     currentBet = amount;
-    
+
     broadcastGameState();
     nextPlayerTurn();
 }
@@ -152,21 +153,17 @@ wss.on("connection", (ws) => {
             if (data.type === "join") {
                 console.log(`👤 Player joined: ${data.name}`);
 
-                // Prevent duplicates
                 if (!players.some(player => player.name === data.name)) {
-                    players.push({ name: data.name, chips: 1000 });
+                    players.push({ name: data.name, tokens: 1000, ws });
 
-                    // Broadcast updated players list to ALL clients
                     broadcast({ type: "updatePlayers", players });
                 }
             }
 
             if (data.type === "startGame") {
-    console.log("🎲 Starting game...");
-    startGame();
-    broadcast({ type: "startGame" });  // ✅ Notify all clients that the game has started
-}
-
+                console.log("🎲 Starting game...");
+                startGame();
+            }
 
             if (data.type === "nextRound") {
                 nextRound();
