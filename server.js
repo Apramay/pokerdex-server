@@ -162,8 +162,11 @@ wss.on("connection", (ws) => {
             }
 
             if (data.type === "startGame") {
-                startGame();
-            }
+    console.log("🎲 Starting game...");
+    startGame();
+    broadcast({ type: "startGame" });  // ✅ Notify all clients that the game has started
+}
+
 
             if (data.type === "nextRound") {
                 nextRound();
