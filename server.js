@@ -142,49 +142,31 @@ function check(playerName) {
     nextPlayerTurn();
 }
 
-wss.on("connection", (ws) => {
-    console.log("✅ New player connected");
-    ws.send(JSON.stringify({ type: "updatePlayers", players }));
+socket.onmessage = function(event) {
+    console.log("📩 Received message from WebSocket:", event.data);
 
-    ws.on("message", (message) => {
-        try {
-            const data = JSON.parse(message);
-
-            if (data.type === "join") {
-                console.log(`👤 Player joined: ${data.name}`);
-
-                if (!players.some(player => player.name === data.name)) {
-                    players.push({ name: data.name, tokens: 1000, ws });
-
-                    broadcast({ type: "updatePlayers", players });
-                }
-            }
-
-            if (data.type === "startGame") {
-                console.log("🎲 Starting game...");
-                startGame();
-            }
-
-            if (data.type === "nextRound") {
-                nextRound();
-                broadcastGameState();
-            }
-        } catch (error) {
-            console.error("❌ Error handling message:", error);
+    try {
+        let data = JSON.parse(event.data);
+        if (data.type === "updatePlayers") {
+            console.log("🔄 Updating players list:", data.players);
+            updateUI(data.players);
         }
-    });
-
-    ws.on("close", () => {
-        console.log("🚪 A player disconnected");
-        players = players.filter(player => player.ws !== ws);
-        if (players.length === 1) {
-            console.log(`${players[0].name} wins by default!`);
-            resetGame();
+        if (data.type === "startGame") {
+            console.log("🎲 Game has started!");
+            // No need to call startGame() here
         }
-        broadcastGameState();
-    });
-});
+        if (data.type === "updateGameState") {
+            console.log("🔄 Updating game state:", data);
+            players = data.players;
+            tableCards = data.tableCards;
+            pot = data.pot;
+            currentBet = data.currentBet;
+            round = data.round;
+            currentPlayerIndex = data.currentPlayerIndex;
+            updateUI(players);
+        }
 
-server.listen(3000, () => {
-    console.log("🚀 Server running on port 3000");
-});
+    } catch (error) {
+        console.error("❌ Error parsing message:", error);
+    }
+};
