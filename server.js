@@ -31,7 +31,7 @@ let playersWhoActed = new Set();
 
 // Function to create a new deck of cards
 function createDeck() {
-    let deck =;
+    let deck = [];
     suits.forEach(suit => {
         ranks.forEach(rank => {
             deck.push({ suit, rank });
