@@ -111,13 +111,16 @@ function setupBlinds() {
     setTimeout(() => {
         if (currentBet === bigBlindAmount) {
             console.log(`${players[bigBlindIndex].name} can check.`);
+            currentPlayerIndex = bigBlindIndex; // ✅ Ensure big blind gets the option
+            broadcastGameState();
             broadcast({ type: "bigBlindCanCheck", playerName: players[bigBlindIndex].name });
+            return; // ✅ Prevent moving forward until big blind acts
+        } else {
+            setTimeout(bettingRound, 500);
         }
     }, 1000);
-
-    broadcastGameState();
-    setTimeout(bettingRound, 500);
 }
+
 
 
 
@@ -169,16 +172,19 @@ function bettingRound() {
 
     const player = players[currentPlayerIndex];
 
-    // If this player has already acted, move to the next one
+    // ✅ FIX: Ensure betting round advances only when needed
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        bettingRound();
+        if (currentPlayerIndex !== -1) {
+            bettingRound();
+        }
         return;
     }
 
     console.log(`Waiting for player ${player.name} to act...`);
     broadcast({ type: "playerTurn", playerName: player.name });
 }
+
 
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
@@ -187,7 +193,6 @@ function isBettingRoundOver() {
     const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
     return allCalled;
 }
-
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
 
@@ -199,20 +204,26 @@ function getNextPlayerIndex(currentIndex) {
     let nextIndex = (currentIndex + 1) % players.length;
     let attempts = 0;
 
-    // ✅ FIX: Skip players who ALREADY MATCHED the current bet
+    // ✅ FIX: Ensure all players act before advancing to next round
     while (
         (players[nextIndex].status !== "active" || 
         players[nextIndex].tokens === 0 || 
-        players[nextIndex].allIn || 
-        players[nextIndex].currentBet === currentBet) 
+        players[nextIndex].allIn) 
         && attempts < players.length
     ) {
         nextIndex = (nextIndex + 1) % players.length;
         attempts++;
     }
 
+    // ✅ FIX: Ensure round moves forward after last call
+    if (playersWhoActed.size >= activePlayers.length && players[nextIndex].currentBet === currentBet) {
+        nextRound();
+        return -1;
+    }
+
     return nextIndex;
 }
+
 
 
 function nextRound() {
