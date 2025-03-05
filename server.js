@@ -393,7 +393,7 @@ wss.on('connection', function connection(ws) {
                     name: data.name,
                     ws: ws,
                     tokens: 1000,
-                    hand:,
+                    hand:[],
                     currentBet: 0,
                     status: 'active',
                     allIn: false
