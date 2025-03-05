@@ -54,7 +54,7 @@ function broadcast(data) {
 function broadcastGameState() {
     broadcast({
         type: "updateGameState",
-        players: players.map(({ ws, ...player }) => player), // Exclude the ws object
+        players: players.map(({ ws, ...player }) => player),
         tableCards,
         pot,
         currentBet,
@@ -70,8 +70,7 @@ function startGame() {
         console.log("❌ Not enough players to start the game.");
         return;
     }
-    deckForGame = createDeck();
-    deckForGame = deckForGame.sort(() => Math.random() - 0.5);
+    deckForGame = shuffleDeck(createDeck());
     dealerIndex = Math.floor(Math.random() * players.length);
     startNewHand();
     broadcast({ type: "startGame" });
@@ -127,7 +126,7 @@ function postBlind(player, amount) {
 
 // Function to deal a hand of cards to a player
 function dealHand(deck, numCards) {
-    const hand =[];
+    const hand = [];
     for (let i = 0; i < numCards; i++) {
         hand.push(deck.pop());
     }
@@ -147,13 +146,21 @@ function shuffleDeck(deck) {
 function bettingRound() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
-    if (activePlayers.length <= 1 || isBettingRoundOver()) {
+    if (activePlayers.length <= 1) {
+        console.log("Only one player left, moving to next round.");
+        setTimeout(nextRound, 1000);
+        return;
+    }
+
+    if (isBettingRoundOver()) {
+        console.log("All players have acted. Betting round is over.");
         setTimeout(nextRound, 1000);
         return;
     }
 
     const player = players[currentPlayerIndex];
 
+    // If this player has already acted, move to the next one
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         bettingRound();
@@ -161,18 +168,20 @@ function bettingRound() {
     }
 
     console.log(`Waiting for player ${player.name} to act...`);
+    broadcast({ type: "playerTurn", playerName: player.name });
 }
 
-// Function to check if the betting round is over
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
     if (activePlayers.length <= 1) {
-        return true;
+        return true; // If only one player remains, the round ends.
     }
 
+    // Ensure all active players have matched the current bet
     const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
 
+    // If all active players have called or folded, the round is over
     if (allCalled && playersWhoActed.size >= activePlayers.length) {
         return true;
     }
@@ -180,7 +189,6 @@ function isBettingRoundOver() {
     return false;
 }
 
-// Function to get the index of the next player in the game
 function getNextPlayerIndex(currentIndex) {
     let nextIndex = (currentIndex + 1) % players.length;
     let attempts = 0;
@@ -194,8 +202,9 @@ function getNextPlayerIndex(currentIndex) {
     return nextIndex;
 }
 
-// Function to move to the next round of the game
 function nextRound() {
+    console.log("nextRound() called. Current round:", round);
+
     currentBet = 0;
     players.forEach(player => player.currentBet = 0);
     playersWhoActed.clear();
@@ -216,20 +225,17 @@ function nextRound() {
     setTimeout(bettingRound, 500);
 }
 
-// Function to handle the showdown when all rounds are finished
 function showdown() {
     console.log("Showdown!");
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
     let winners = determineWinners(activePlayers);
     winners.forEach(winner => {
-        console.log(`${winner.name} wins the hand!`);
-    });
+        console.log(`${winner.name} wins the hand!`);});
     distributePot();
     broadcastGameState();
     setTimeout(resetGame, 3000);
 }
 
-// Function to distribute the pot to the winners
 function distributePot() {
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
     let winners = determineWinners(activePlayers);
@@ -253,14 +259,13 @@ function distributePot() {
     pot = 0; // Reset the pot
 }
 
-// Function to determine the winners of the game
 function determineWinners(playerList) {
     if (playerList.length === 0) {
         return;
     }
 
     let bestHandValue = -1;
-    let winners = [];
+    let winners =;
 
     playerList.forEach(player => {
         if (player.status !== "folded") {
@@ -394,7 +399,7 @@ wss.on('connection', function connection(ws) {
                     name: data.name,
                     ws: ws,
                     tokens: 1000,
-                    hand:[],
+                    hand:,
                     currentBet: 0,
                     status: 'active',
                     allIn: false
@@ -405,15 +410,15 @@ wss.on('connection', function connection(ws) {
             } else if (data.type === 'startGame') {
                 startGame();
             } else if (data.type === 'bet') {
-                // Handle bet action
+                handleBet(data);
             } else if (data.type === 'raise') {
-                // Handle raise action
+                handleRaise(data);
             } else if (data.type === 'call') {
-                // Handle call action
+                handleCall(data);
             } else if (data.type === 'fold') {
-                // Handle fold action
+                handleFold(data);
             } else if (data.type === 'check') {
-                // Handle check action
+                handleCheck(data);
             }
 
         } catch (error) {
@@ -427,6 +432,117 @@ wss.on('connection', function connection(ws) {
         broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
     });
 });
+
+// Action handlers
+function handleBet(data) {
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
+
+    const betAmount = parseInt(data.amount);
+
+    if (betAmount > player.tokens) {
+        console.error("Not enough tokens:", data.playerName);
+        return;
+    }
+
+    player.tokens -= betAmount;
+    player.currentBet = betAmount;
+    pot += betAmount;
+    currentBet = betAmount; // Update the current bet
+
+    // Move to the next player
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+
+    // Broadcast the updated game state
+    broadcastGameState();
+}
+
+function handleRaise(data) {
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
+
+    const raiseAmount = parseInt(data.amount);
+
+    if (raiseAmount <= currentBet || raiseAmount > player.tokens) {
+        console.error("Invalid raise amount:", data.playerName);
+        return;
+    }
+
+    const totalBet = raiseAmount;
+    player.tokens -= totalBet - player.currentBet;
+    pot += totalBet - player.currentBet;
+    player.currentBet = totalBet;
+    currentBet = totalBet;
+
+    // Move to the next player
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+
+    // Broadcast the updated game state
+    broadcastGameState();
+}
+
+function handleCall(data) {
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
+
+    let amount = Math.min(currentBet - player.currentBet, player.tokens);
+    player.tokens -= amount;
+    player.currentBet += amount;
+    pot += amount;
+    if (player.tokens === 0) {
+        player.allIn = true;
+    }
+
+    // Move to the next player
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+
+    // Broadcast the updated game state
+    broadcastGameState();
+}
+
+function handleFold(data) {
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
+
+    player.status = "folded";
+
+    // Move to the next player
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+
+    // Broadcast the updated game state
+    broadcastGameState();
+}
+
+function handleCheck(data) {
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
+
+    if (currentBet === 0 || player.currentBet === currentBet) {
+        // Move to the next player
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+
+        // Broadcast the updated game state
+        broadcastGameState();
+    } else {
+        // You cannot check when there is a bet.
+        // You might want to send an error message back to the client here.
+    }
+}
 
 // Start the server
 server.listen(process.env.PORT || 8080, () => {
