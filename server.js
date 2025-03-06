@@ -186,6 +186,10 @@ function bettingRound() {
 
     // ✅ DO NOT SKIP PLAYER AUTOMATICALLY - Wait for action
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
+                currentPlayerIndex = getNextPlayerIndex(dealerIndex);
+                bettingRound();
+
+
         return; // Wait for manual action instead of moving automatically
     }
 
@@ -276,14 +280,6 @@ function nextRound() {
         tableCards.push(dealHand(deckForGame, 1)[0]); // River
         broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
     } else if (round === 3) {
-        showdown();
-        return;
-    }
-
-    // ✅ Ensure a valid player starts the betting round
-    currentPlayerIndex = getNextPlayerIndex(dealerIndex);
-    if (currentPlayerIndex === -1) {
-        console.warn("⚠ No valid player to continue. Ending hand.");
         showdown();
         return;
     }
