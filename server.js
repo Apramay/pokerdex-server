@@ -311,7 +311,7 @@ function distributePot() {
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
     activePlayers.sort((a, b) => a.currentBet - b.currentBet);
 
-    let totalpot = pot;
+    let totalPot = pot;
     let sidePots = [];
     while (activePlayers.length > 0) {
         const minBet = activePlayers[0].currentBet;
