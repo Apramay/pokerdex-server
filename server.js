@@ -246,6 +246,13 @@ function getNextPlayerIndex(currentIndex) {
 
     return nextIndex;
 }
+function startFlopBetting() {
+    currentBet = 0; // Reset betting amount
+    currentPlayerIndex = (dealerIndex + 1) % players.length; // Start from Small Blind
+    playersWhoActed.clear();
+    bettingRound();
+}
+
 
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
