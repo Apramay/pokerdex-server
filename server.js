@@ -118,7 +118,13 @@ function setupBlinds() {
 
     broadcastGameState();
     broadcast({ type: "blindsPosted", smallBlind: players[smallBlindIndex].name, bigBlind: players[bigBlindIndex].name });
-    setTimeout(bettingRound, 500);
+setTimeout(() => {
+    if (currentPlayerIndex === (dealerIndex + 2) % players.length) {
+        bigBlindCheckRaiseOption();
+    } else {
+        bettingRound();
+    }
+}, 500);
 }
 
 
