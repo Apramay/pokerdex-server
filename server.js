@@ -136,6 +136,34 @@ function postBlind(player, amount) {
     console.log(`${player.name} posts ${blindAmount}.`);
 }
 
+function bigBlindCheckRaiseOption() {
+    let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
+
+    if (!bigBlindPlayer || bigBlindPlayer.status !== "active") {
+        console.log("❌ Big blind player is not active.");
+        return;
+    }
+
+    if (currentBet === bigBlindAmount) { 
+        // No raises occurred, so big blind can check or bet
+        console.log(`${bigBlindPlayer.name}, you can check or bet.`);
+        bigBlindPlayer.ws.send(JSON.stringify({
+            type: "bigBlindAction",
+            message: `${bigBlindPlayer.name}, you can check or bet.`,
+            options: ["check", "bet"]
+        }));
+    } else {
+        // Someone raised, so big blind must call or fold
+        console.log(`${bigBlindPlayer.name}, you must call or fold.`);
+        bigBlindPlayer.ws.send(JSON.stringify({
+            type: "bigBlindAction",
+            message: `${bigBlindPlayer.name}, you must call or fold.`,
+            options: ["call", "fold", "raise"]
+        }));
+    }
+}
+
+
 // Function to deal a hand of cards to a player
 function dealHand(deck, numCards) {
     const hand = [];
