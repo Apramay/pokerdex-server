@@ -116,18 +116,9 @@ function setupBlinds() {
     
     playersWhoActed.clear();
 
-    // ✅ FIX: Allow big blind to check if no one raises
-    setTimeout(() => {
-        if (currentBet === bigBlindAmount) {
-            console.log(`${players[bigBlindIndex].name} can check.`);
-            currentPlayerIndex = bigBlindIndex; // ✅ Ensure big blind gets the option
-            broadcastGameState();
-            broadcast({ type: "bigBlindCanCheck", playerName: players[bigBlindIndex].name });
-            return; // ✅ Prevent moving forward until big blind acts
-        } else {
-            setTimeout(bettingRound, 500);
-        }
-    }, 1000);
+    broadcastGameState();
+    broadcast({ type: "blindsPosted", smallBlind: players[smallBlindIndex].name, bigBlind: players[bigBlindIndex].name });
+    setTimeout(bettingRound, 500);
 }
 
 
