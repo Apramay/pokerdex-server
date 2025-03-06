@@ -245,37 +245,7 @@ function getNextPlayerIndex(currentIndex) {
 
     return nextIndex;
 }
-function playerAction(playerName, action, amount = 0) {
-    const player = players[currentPlayerIndex];
 
-    if (!player || player.name !== playerName) {
-        console.log(`❌ Invalid action: It's not ${playerName}'s turn.`);
-        return;
-    }
-
-    // Handle action (bet, call, fold, etc.)
-    if (action === "fold") {
-        player.status = "folded";
-        console.log(`${player.name} folds.`);
-    } else if (action === "call") {
-        const callAmount = currentBet - player.currentBet;
-        player.tokens -= callAmount;
-        player.currentBet += callAmount;
-        console.log(`${player.name} calls ${callAmount}.`);
-    } else if (action === "bet" && amount > currentBet) {
-        currentBet = amount;
-        player.tokens -= amount;
-        player.currentBet = amount;
-        console.log(`${player.name} bets ${amount}.`);
-    } else {
-        console.log("❌ Invalid action or amount.");
-        return;
-    }
-
-    playersWhoActed.add(player.name);
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-    bettingRound();
-}
 
 function startFlopBetting() {
     currentBet = 0;
@@ -363,8 +333,15 @@ function distributePot() {
             winner.tokens += splitPot;
         });
     });
-
-    pot = 0;
+let remainingPot = totalPot - sidePots.reduce((acc, sp) => acc + sp.amount, 0);
+    if (remainingPot > 0) {
+        let mainWinners = determineWinners(players.filter(p => p.status === "active"));
+        let splitPot = Math.floor(remainingPot / mainWinners.length);
+        mainWinners.forEach(winner => {
+            winner.tokens += splitPot;
+            displayMessage(`${winner.name} wins ${splitPot} from the main pot.`);
+        });
+    }
 }
 function resetGame() {
     console.log("Resetting game for the next round.");
