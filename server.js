@@ -156,6 +156,8 @@ function shuffleDeck(deck) {
 
 // Function to manage the betting round
 function bettingRound() {
+    console.log("Starting betting round...");
+
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
     if (activePlayers.length <= 1) {
@@ -170,13 +172,23 @@ function bettingRound() {
         return;
     }
 
-    const player = players[currentPlayerIndex];
+    // Ensure currentPlayerIndex is valid
+    if (currentPlayerIndex < 0 || currentPlayerIndex >= players.length) {
+        console.error("❌ Invalid currentPlayerIndex:", currentPlayerIndex);
+        currentPlayerIndex = getNextPlayerIndex(dealerIndex);
+    }
 
-    // ✅ FIX: Ensure betting round advances only when needed
+    const player = players[currentPlayerIndex];
+    if (!player) {
+        console.error("❌ Betting round failed: No valid player at index", currentPlayerIndex);
+        return;
+    }
+
+    // Check if the player has already acted
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         if (currentPlayerIndex !== -1) {
-            setTimeout(bettingRound, 500);
+            setTimeout(bettingRound, 500); // Delay to prevent instant skipping
         }
         return;
     }
@@ -188,29 +200,34 @@ function bettingRound() {
 
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
-    if (activePlayers.length <= 1) return true;
 
-const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
+    if (activePlayers.length <= 1) {
+        return true; // If only one player remains, the round ends.
+    }
 
-// Ensure all active players have acted before ending the betting round
-if (allCalled && playersWhoActed.size >= activePlayers.length) {
-    return true;
+    // Ensure all active players have matched the current bet
+    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
+
+    // If all active players have called or folded, the round is over
+    if (allCalled && playersWhoActed.size >= activePlayers.length) {
+        return true;
+    }
+
+    return false;
 }
-return false;
 
-}
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
 
     if (activePlayers.length <= 1) {
-        nextRound(); // If only one player remains, move to next round
+        console.log("Only one player remains, moving to next round.");
+        setTimeout(nextRound, 1000);
         return -1;
     }
 
     let nextIndex = (currentIndex + 1) % players.length;
     let attempts = 0;
 
-    // ✅ FIX: Ensure all players act before advancing to next round
     while (
         (players[nextIndex].status !== "active" || 
         players[nextIndex].tokens === 0 || 
@@ -221,24 +238,20 @@ function getNextPlayerIndex(currentIndex) {
         attempts++;
     }
 
-    // ✅ FIX: Ensure round moves forward after last call
-    if (playersWhoActed.size >= activePlayers.length && players[nextIndex].currentBet === currentBet) {
-        nextRound();
+    if (attempts >= players.length) {
+        console.warn("⚠ No valid player found. Ending round.");
+        setTimeout(nextRound, 1000);
         return -1;
     }
 
     return nextIndex;
 }
 
-
-
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
 
-    currentPlayerIndex = (dealerIndex + 1) % players.length; // Set starting player
-
     currentBet = 0;
-    players.forEach(player => player.currentBet = 0);
+    players.forEach(player => (player.currentBet = 0));
     playersWhoActed.clear();
 
     if (round === 0) {
@@ -258,8 +271,16 @@ function nextRound() {
         return;
     }
 
+    // Ensure a valid player starts the betting round
+    currentPlayerIndex = getNextPlayerIndex(dealerIndex);
+    if (currentPlayerIndex === -1) {
+        console.warn("⚠ No valid player to continue. Ending hand.");
+        showdown();
+        return;
+    }
+
     broadcastGameState();
-    setTimeout(bettingRound, 1000);
+    setTimeout(startFlopBetting, 1000);
 }
 
 function showdown() {
