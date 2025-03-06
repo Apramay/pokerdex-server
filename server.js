@@ -243,11 +243,19 @@ function getNextPlayerIndex(currentIndex) {
 }
 
 function startFlopBetting() {
-    currentBet = 0; // Reset betting amount
-    currentPlayerIndex = (dealerIndex + 1) % players.length; // Start from Small Blind
+    currentBet = 0;
+    
+    // ✅ Ensure betting starts with the first active player left of the dealer
+    let startIndex = (dealerIndex + 1) % players.length;
+    while (players[startIndex].status !== "active") {
+        startIndex = (startIndex + 1) % players.length;
+    }
+    currentPlayerIndex = startIndex;
+
     playersWhoActed.clear();
-    bettingRound();
+    broadcastGameState();
 }
+
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
 
@@ -284,6 +292,8 @@ function nextRound() {
     setTimeout(startFlopBetting, 1000);
 }
 
+
+
 function showdown() {
     console.log("Showdown!");
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
@@ -292,6 +302,11 @@ function showdown() {
         console.log(`${winner.name} wins the hand!`);});
     distributePot();
     broadcastGameState();
+    broadcast({
+        type: "winner",
+        winners: winners.map(w => w.name),
+        pot: pot
+    });
     setTimeout(resetGame, 3000);
 }
 
@@ -323,6 +338,20 @@ function distributePot() {
     });
 
     pot = 0;
+}
+function resetGame() {
+    console.log("Resetting game for the next round.");
+    round = 0;
+    tableCards = [];
+    pot = 0;
+    players.forEach(player => {
+        player.hand = [];
+        player.currentBet = 0;
+        player.status = "active";
+        player.allIn = false;
+    });
+    dealerIndex = (dealerIndex + 1) % players.length; // Move dealer button
+    startNewHand();
 }
 
 
