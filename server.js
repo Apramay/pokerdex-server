@@ -52,15 +52,24 @@ function broadcast(data) {
 
 // Function to broadcast the current game state to all clients
 function broadcastGameState() {
-    broadcast({
-        type: "updateGameState",
-        players: players.map(({ ws, ...player }) => player),
-        tableCards,
-        pot,
-        currentBet,
-        round,
-        currentPlayerIndex,
-        dealerIndex: dealerIndex
+    players.forEach(player => {
+        const privateGameState = {
+            type: "updateGameState",
+            players: players.map(({ ws, hand, ...playerData }) => ({
+                ...playerData, 
+                hand: player.name === playerData.name ? hand : [] // ✅ Only send their own hand
+            })),
+            tableCards,
+            pot,
+            currentBet,
+            round,
+            currentPlayerIndex,
+            dealerIndex
+        };
+
+        if (player.ws.readyState === WebSocket.OPEN) {
+            player.ws.send(JSON.stringify(privateGameState));
+        }
     });
 }
 
