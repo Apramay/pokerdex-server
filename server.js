@@ -245,6 +245,37 @@ function getNextPlayerIndex(currentIndex) {
 
     return nextIndex;
 }
+function playerAction(playerName, action, amount = 0) {
+    const player = players[currentPlayerIndex];
+
+    if (!player || player.name !== playerName) {
+        console.log(`❌ Invalid action: It's not ${playerName}'s turn.`);
+        return;
+    }
+
+    // Handle action (bet, call, fold, etc.)
+    if (action === "fold") {
+        player.status = "folded";
+        console.log(`${player.name} folds.`);
+    } else if (action === "call") {
+        const callAmount = currentBet - player.currentBet;
+        player.tokens -= callAmount;
+        player.currentBet += callAmount;
+        console.log(`${player.name} calls ${callAmount}.`);
+    } else if (action === "bet" && amount > currentBet) {
+        currentBet = amount;
+        player.tokens -= amount;
+        player.currentBet = amount;
+        console.log(`${player.name} bets ${amount}.`);
+    } else {
+        console.log("❌ Invalid action or amount.");
+        return;
+    }
+
+    playersWhoActed.add(player.name);
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+    bettingRound();
+}
 
 function startFlopBetting() {
     currentBet = 0;
