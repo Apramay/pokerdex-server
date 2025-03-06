@@ -176,7 +176,7 @@ function bettingRound() {
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         if (currentPlayerIndex !== -1) {
-            bettingRound();
+            setTimeout(bettingRound, 500);
         }
         return;
     }
@@ -190,8 +190,14 @@ function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
     if (activePlayers.length <= 1) return true;
 
-    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
-    return allCalled;
+const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
+
+// Ensure all active players have acted before ending the betting round
+if (allCalled && playersWhoActed.size >= activePlayers.length) {
+    return true;
+}
+return false;
+
 }
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
