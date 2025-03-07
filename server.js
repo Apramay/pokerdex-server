@@ -146,17 +146,17 @@ function bigBlindCheckRaiseOption() {
     if (!bigBlindPlayer || bigBlindPlayer.status !== "active") return;
 
     if (currentBet === bigBlindAmount && !playersWhoActed.has(bigBlindPlayer.name)) { 
-        console.log(`${bigBlindPlayer.name}, you can check or bet.`);
+       console.log(`${bigBlindPlayer.name}, you can check or bet.`);
         bigBlindPlayer.ws.send(JSON.stringify({
             type: "bigBlindAction",
-            message: ${bigBlindPlayer.name}, you can check or bet.,
+            message: `${bigBlindPlayer.name}, you can check or bet.`,
             options: ["check", "bet"]
         }));
     } else if (!playersWhoActed.has(bigBlindPlayer.name)) {
         console.log(`${bigBlindPlayer.name}, you must call or fold.`);
         bigBlindPlayer.ws.send(JSON.stringify({
             type: "bigBlindAction",
-            message: ${bigBlindPlayer.name}, you must call or fold.,
+            message: `${bigBlindPlayer.name}, you must call or fold.`,
             options: ["call", "fold", "raise"]
         }));
     }
