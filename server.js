@@ -224,6 +224,7 @@ function isBettingRoundOver() {
     const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
 
     if (allCalled && playersWhoActed.size >= activePlayers.length) {
+        playersWhoActed.clear();
         return true;
     }
 
