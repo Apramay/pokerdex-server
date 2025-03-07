@@ -145,29 +145,27 @@ function postBlind(player, amount) {
 function bigBlindCheckRaiseOption() {
     let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
 
-    if (!bigBlindPlayer || bigBlindPlayer.status !== "active") {
-        console.log("❌ Big blind player is not active.");
-        return;
-    }
+    if (!bigBlindPlayer || bigBlindPlayer.status !== "active") return;
 
-    if (currentBet === bigBlindAmount) { 
-        // No raises occurred, so big blind can check or bet
+    if (currentBet === bigBlindAmount && !playersWhoActed.has(bigBlindPlayer.name)) { 
         console.log(`${bigBlindPlayer.name}, you can check or bet.`);
         bigBlindPlayer.ws.send(JSON.stringify({
             type: "bigBlindAction",
             message: `${bigBlindPlayer.name}, you can check or bet.`,
             options: ["check", "bet"]
         }));
-    } else {
-        // Someone raised, so big blind must call or fold
+        playersWhoActed.add(bigBlindPlayer.name); // ✅ Prevents duplicate turn
+    } else if (!playersWhoActed.has(bigBlindPlayer.name)) {
         console.log(`${bigBlindPlayer.name}, you must call or fold.`);
         bigBlindPlayer.ws.send(JSON.stringify({
             type: "bigBlindAction",
             message: `${bigBlindPlayer.name}, you must call or fold.`,
             options: ["call", "fold", "raise"]
         }));
+        playersWhoActed.add(bigBlindPlayer.name); // ✅ Prevents duplicate turn
     }
 }
+
 
 
 // Function to deal a hand of cards to a player
@@ -187,8 +185,6 @@ function shuffleDeck(deck) {
     }
     return deck;
 }
-
-// Function to manage the betting round
 function bettingRound() {
     console.log("Starting betting round...");
 
@@ -206,48 +202,35 @@ function bettingRound() {
         return;
     }
 
-    // Ensure valid current player
-    if (currentPlayerIndex < 0 || currentPlayerIndex >= players.length) {
-        console.error("❌ Invalid currentPlayerIndex:", currentPlayerIndex);
-        currentPlayerIndex = getNextPlayerIndex(dealerIndex);
-    }
-
     const player = players[currentPlayerIndex];
-    if (!player) {
-        console.error("❌ Betting round failed: No valid player at index", currentPlayerIndex);
-        return;
-    }
 
-    // ✅ DO NOT SKIP PLAYER AUTOMATICALLY - Wait for action
+    // ✅ Skip player if they already acted and are not facing a raise
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
-                currentPlayerIndex = getNextPlayerIndex(dealerIndex);
-                bettingRound();
-
-
-        return; // Wait for manual action instead of moving automatically
+        console.log(`${player.name} has already acted. Skipping...`);
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+        bettingRound();
+        return;
     }
 
     console.log(`Waiting for player ${player.name} to act...`);
     broadcast({ type: "playerTurn", playerName: player.name });
 }
+
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
-    if (activePlayers.length <= 1) {
-        return true; // End the round if only one player remains.
-    }
+    if (activePlayers.length <= 1) return true; // ✅ Ends round if one player left
 
-    // ✅ Ensure all active players have acted
-    const allCalled = activePlayers.every(player => 
-        player.currentBet === currentBet || player.status === "folded"
-    );
+    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
 
     if (allCalled && playersWhoActed.size >= activePlayers.length) {
+        playersWhoActed.clear(); // ✅ Reset tracking for the next round
         return true;
     }
 
     return false;
 }
+
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
 
@@ -270,7 +253,6 @@ function getNextPlayerIndex(currentIndex) {
         attempts++;
     }
 
-    // ✅ Ensure the function returns a valid player OR properly ends the round
     if (attempts >= players.length) {
         console.warn("⚠ No valid player found. Ending round.");
         setTimeout(nextRound, 1000);
@@ -279,6 +261,7 @@ function getNextPlayerIndex(currentIndex) {
 
     return nextIndex;
 }
+
 
 
 function startFlopBetting() {
