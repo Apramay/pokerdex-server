@@ -200,14 +200,22 @@ function bettingRound() {
 
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
-    if (activePlayers.length <= 1) return true;
-    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
-    if (allCalled && playersWhoActed.size >= activePlayers.length) {
+    
+    if (activePlayers.length <= 1) return true; // Only one player left, round ends
+    
+    // Check if all remaining players have called or checked
+    const allCalledOrChecked = activePlayers.every(player => 
+        player.currentBet === currentBet || currentBet === 0 || player.status === "folded"
+    );
+
+    if (allCalledOrChecked) {
         playersWhoActed.clear();
         return true;
     }
+
     return false;
 }
+
 
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
@@ -327,7 +335,7 @@ let remainingPot = totalPot - sidePots.reduce((acc, sp) => acc + sp.amount, 0);
         let splitPot = Math.floor(remainingPot / mainWinners.length);
         mainWinners.forEach(winner => {
             winner.tokens += splitPot;
-            displayMessage(`${winner.name} wins ${splitPot} from the main pot.`);
+            console.log(`${winner.name} wins ${splitPot} from the main pot.`);
         });
     }
 }
