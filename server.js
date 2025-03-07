@@ -141,7 +141,6 @@ function postBlind(player, amount) {
     }
     console.log(`${player.name} posts ${blindAmount}.`);
 }
-
 function bigBlindCheckRaiseOption() {
     let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
     if (!bigBlindPlayer || bigBlindPlayer.status !== "active") return;
@@ -162,7 +161,6 @@ function bigBlindCheckRaiseOption() {
         }));
     }
 }
-
 
 // Function to deal a hand of cards to a player
 function dealHand(deck, numCards) {
