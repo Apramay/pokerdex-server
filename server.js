@@ -197,24 +197,26 @@ function bettingRound() {
     console.log(`Waiting for player ${player.name} to act...`);
     broadcast({ type: "playerTurn", playerName: player.name });
 }
-
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
     
-    if (activePlayers.length <= 1) return true; // Only one player left, round ends
+    if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
     
-    // ✅ Correct condition: Move forward once all remaining players have matched the current bet
-    const allCalledOrFolded = activePlayers.every(player => 
+    // ✅ Move to the next round as soon as all players have either:
+    // 1. Called (matched the currentBet)
+    // 2. Folded
+    const allBetsMatched = activePlayers.every(player => 
         player.currentBet === currentBet || player.status === "folded"
     );
 
-    if (allCalledOrFolded) {
-        playersWhoActed.clear(); // Reset for next round
+    if (allBetsMatched) {
+        playersWhoActed.clear(); // Reset for the next round
         return true;
     }
 
     return false;
 }
+
 
 
 function getNextPlayerIndex(currentIndex) {
