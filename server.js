@@ -578,12 +578,16 @@ function handleRaise(data) {
     player.currentBet = totalBet;
     currentBet = totalBet;
 
+    // ✅ Mark this player as having acted
+    playersWhoActed.add(player.name); 
+
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
     // Broadcast the updated game state
     broadcastGameState();
 }
+
 
 function handleCall(data) {
     const player = players.find(p => p.name === data.playerName);
