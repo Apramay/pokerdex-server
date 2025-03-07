@@ -194,7 +194,7 @@ function bettingRound() {
         bettingRound();
         return;
     }
-    console.log(Waiting for player ${player.name} to act...);
+    console.log(`Waiting for player ${player.name} to act...`);
     broadcast({ type: "playerTurn", playerName: player.name });
 }
 
