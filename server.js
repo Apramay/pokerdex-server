@@ -203,13 +203,13 @@ function isBettingRoundOver() {
     
     if (activePlayers.length <= 1) return true; // Only one player left, round ends
     
-    // Check if all remaining players have called or checked
-    const allCalledOrChecked = activePlayers.every(player => 
-        player.currentBet === currentBet || currentBet === 0 || player.status === "folded"
+    // ✅ Correct condition: Move forward once all remaining players have matched the current bet
+    const allCalledOrFolded = activePlayers.every(player => 
+        player.currentBet === currentBet || player.status === "folded"
     );
 
-    if (allCalledOrChecked) {
-        playersWhoActed.clear();
+    if (allCalledOrFolded) {
+        playersWhoActed.clear(); // Reset for next round
         return true;
     }
 
