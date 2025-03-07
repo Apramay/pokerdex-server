@@ -198,20 +198,6 @@ function bettingRound() {
     broadcast({ type: "playerTurn", playerName: player.name });
 }
 
-    const player = players[currentPlayerIndex];
-
-    // ✅ Skip player if they already acted and are not facing a raise
-    if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
-        console.log(`${player.name} has already acted. Skipping...`);
-        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        bettingRound();
-        return;
-    }
-
-    console.log(`Waiting for player ${player.name} to act...`);
-    broadcast({ type: "playerTurn", playerName: player.name });
-}
-
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
     if (activePlayers.length <= 1) return true;
