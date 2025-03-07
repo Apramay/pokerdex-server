@@ -189,7 +189,7 @@ function bettingRound() {
     }
     const player = players[currentPlayerIndex];
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
-        console.log(${player.name} has already acted. Skipping...);
+        console.log(`${player.name} has already acted. Skipping...`);
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         bettingRound();
         return;
