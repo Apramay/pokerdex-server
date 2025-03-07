@@ -221,26 +221,41 @@ function isBettingRoundOver() {
 
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
+    
     if (activePlayers.length <= 1) {
         console.log("Only one player remains, moving to next round.");
         setTimeout(nextRound, 1000);
         return -1;
     }
+
     let nextIndex = (currentIndex + 1) % players.length;
+    let initialIndex = currentIndex; // Store who originally acted
     let attempts = 0;
+
     while (
         (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
         && attempts < players.length
     ) {
         nextIndex = (nextIndex + 1) % players.length;
         attempts++;
+
+        // If we looped back to the original raiser, stop
+        if (nextIndex === initialIndex) {
+            console.log("✅ All players have acted. Moving to the next round.");
+            setTimeout(nextRound, 1000);
+            return -1;
+        }
     }
+
     if (attempts >= players.length) {
         console.warn("⚠ No valid player found. Ending round.");
         setTimeout(nextRound, 1000);
         return -1;
     }
+
     return nextIndex;
+}
+eturn nextIndex;
 }
 
 
