@@ -144,28 +144,24 @@ function postBlind(player, amount) {
 
 function bigBlindCheckRaiseOption() {
     let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
-
     if (!bigBlindPlayer || bigBlindPlayer.status !== "active") return;
 
     if (currentBet === bigBlindAmount && !playersWhoActed.has(bigBlindPlayer.name)) { 
-        console.log(`${bigBlindPlayer.name}, you can check or bet.`);
+        console.log(${bigBlindPlayer.name}, you can check or bet.);
         bigBlindPlayer.ws.send(JSON.stringify({
             type: "bigBlindAction",
-            message: `${bigBlindPlayer.name}, you can check or bet.`,
+            message: ${bigBlindPlayer.name}, you can check or bet.,
             options: ["check", "bet"]
         }));
-        playersWhoActed.add(bigBlindPlayer.name); // ✅ Prevents duplicate turn
     } else if (!playersWhoActed.has(bigBlindPlayer.name)) {
-        console.log(`${bigBlindPlayer.name}, you must call or fold.`);
+        console.log(${bigBlindPlayer.name}, you must call or fold.);
         bigBlindPlayer.ws.send(JSON.stringify({
             type: "bigBlindAction",
-            message: `${bigBlindPlayer.name}, you must call or fold.`,
+            message: ${bigBlindPlayer.name}, you must call or fold.,
             options: ["call", "fold", "raise"]
         }));
-        playersWhoActed.add(bigBlindPlayer.name); // ✅ Prevents duplicate turn
     }
 }
-
 
 
 // Function to deal a hand of cards to a player
@@ -187,20 +183,22 @@ function shuffleDeck(deck) {
 }
 function bettingRound() {
     console.log("Starting betting round...");
-
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
-
-    if (activePlayers.length <= 1) {
-        console.log("Only one player left, moving to next round.");
+    if (activePlayers.length <= 1 || isBettingRoundOver()) {
+        console.log("Betting round over, moving to next round.");
         setTimeout(nextRound, 1000);
         return;
     }
-
-    if (isBettingRoundOver()) {
-        console.log("All players have acted. Betting round is over.");
-        setTimeout(nextRound, 1000);
+    const player = players[currentPlayerIndex];
+    if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
+        console.log(${player.name} has already acted. Skipping...);
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+        bettingRound();
         return;
     }
+    console.log(Waiting for player ${player.name} to act...);
+    broadcast({ type: "playerTurn", playerName: player.name });
+}
 
     const player = players[currentPlayerIndex];
 
@@ -218,47 +216,36 @@ function bettingRound() {
 
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
-
-    if (activePlayers.length <= 1) return true; // ✅ Ends round if one player left
-
+    if (activePlayers.length <= 1) return true;
     const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
-
     if (allCalled && playersWhoActed.size >= activePlayers.length) {
         playersWhoActed.clear();
         return true;
     }
-
     return false;
 }
 
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
-
     if (activePlayers.length <= 1) {
         console.log("Only one player remains, moving to next round.");
         setTimeout(nextRound, 1000);
         return -1;
     }
-
     let nextIndex = (currentIndex + 1) % players.length;
     let attempts = 0;
-
     while (
-        (players[nextIndex].status !== "active" || 
-        players[nextIndex].tokens === 0 || 
-        players[nextIndex].allIn) 
+        (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
         && attempts < players.length
     ) {
         nextIndex = (nextIndex + 1) % players.length;
         attempts++;
     }
-
     if (attempts >= players.length) {
         console.warn("⚠ No valid player found. Ending round.");
         setTimeout(nextRound, 1000);
         return -1;
     }
-
     return nextIndex;
 }
 
