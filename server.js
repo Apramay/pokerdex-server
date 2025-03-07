@@ -255,10 +255,6 @@ function getNextPlayerIndex(currentIndex) {
 
     return nextIndex;
 }
-eturn nextIndex;
-}
-
-
 
 function startFlopBetting() {
     currentBet = 0;
