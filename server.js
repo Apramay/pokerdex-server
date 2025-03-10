@@ -118,13 +118,8 @@ function setupBlinds() {
 
     broadcastGameState();
     broadcast({ type: "blindsPosted", smallBlind: players[smallBlindIndex].name, bigBlind: players[bigBlindIndex].name });
-setTimeout(() => {
-    if (currentPlayerIndex === (dealerIndex + 2) % players.length) {
-        bigBlindCheckRaiseOption();
-    } else {
-        bettingRound();
-    }
-}, 500);
+setTimeout(bettingRound, 500);
+
 }
 
 
@@ -141,26 +136,7 @@ function postBlind(player, amount) {
     }
     console.log(`${player.name} posts ${blindAmount}.`);
 }
-function bigBlindCheckRaiseOption() {
-    let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
-    if (!bigBlindPlayer || bigBlindPlayer.status !== "active") return;
 
-    if (currentBet === bigBlindAmount && !playersWhoActed.has(bigBlindPlayer.name)) { 
-       console.log(`${bigBlindPlayer.name}, you can check or bet.`);
-        bigBlindPlayer.ws.send(JSON.stringify({
-            type: "bigBlindAction",
-            message: `${bigBlindPlayer.name}, you can check or bet.`,
-            options: ["check", "bet"]
-        }));
-    } else if (!playersWhoActed.has(bigBlindPlayer.name)) {
-        console.log(`${bigBlindPlayer.name}, you must call or fold.`);
-        bigBlindPlayer.ws.send(JSON.stringify({
-            type: "bigBlindAction",
-            message: `${bigBlindPlayer.name}, you must call or fold.`,
-            options: ["call", "fold", "raise"]
-        }));
-    }
-}
 
 // Function to deal a hand of cards to a player
 function dealHand(deck, numCards) {
@@ -258,17 +234,14 @@ function getNextPlayerIndex(currentIndex) {
 
 function startFlopBetting() {
     currentBet = 0;
-    
-    // ✅ Ensure betting starts with the first active player left of the dealer
-    let startIndex = (dealerIndex + 1) % players.length;
-    while (players[startIndex].status !== "active") {
-        startIndex = (startIndex + 1) % players.length;
-    }
-    currentPlayerIndex = startIndex;
 
+    // Betting starts from Small Blind
+    currentPlayerIndex = (dealerIndex + 1) % players.length;
     playersWhoActed.clear();
-    broadcastGameState();
+
+    bettingRound();
 }
+
 
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
