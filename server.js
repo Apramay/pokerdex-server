@@ -161,14 +161,13 @@ function bettingRound() {
 
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
-    // ✅ If only one active player remains, move to the next round immediately.
     if (activePlayers.length <= 1) {
         console.log("Only one player left, moving to next round.");
         setTimeout(nextRound, 1000);
         return;
     }
 
-    // ✅ Corrected: Don't check `isBettingRoundOver()` too early.
+    // Ensure all players have had a turn before moving on
     if (playersWhoActed.size >= activePlayers.length && isBettingRoundOver()) {
         console.log("All players have acted. Betting round is over.");
         setTimeout(nextRound, 1000);
@@ -177,16 +176,14 @@ function bettingRound() {
 
     const player = players[currentPlayerIndex];
 
-    // ✅ Ensure skipping only if player has acted AND matched the current bet
+    // If this player has already acted AND matched the current bet, move to the next one
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        bettingRound(); // Continue to next player
+        bettingRound();
         return;
     }
 
     console.log(`Waiting for player ${player.name} to act...`);
-
-    // ✅ Ensures UI correctly prompts player action
     playerAction(player);
 }
 
@@ -287,16 +284,23 @@ function nextRound() {
 
     if (round === 0) {
         round++;
-        tableCards = dealHand(deckForGame, 3); // Flop
+        tableCards = dealHand(deckForGame, 3);
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(tableCards)}` });
+
+        // Betting starts with Small Blind after the flop
+        currentPlayerIndex = (dealerIndex + 1) % players.length;
     } else if (round === 1) {
         round++;
-        tableCards.push(dealHand(deckForGame, 1)[0]); // Turn
-        broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
+        if (deckForGame.length > 0) {
+            tableCards.push(dealHand(deckForGame, 1)[0]);
+            broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
+        }
     } else if (round === 2) {
-        round++;;
-        tableCards.push(dealHand(deckForGame, 1)[0]); // River
-        broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
+        round++;
+        if (deckForGame.length > 0) {
+            tableCards.push(dealHand(deckForGame, 1)[0]);
+            broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
+        }
     } else if (round === 3) {
         showdown();
         return;
@@ -305,8 +309,6 @@ function nextRound() {
     broadcastGameState();
     setTimeout(startFlopBetting, 1000);
 }
-
-
 
 function showdown() {
     console.log("Showdown!");
