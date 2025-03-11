@@ -631,7 +631,7 @@ function handleCheck(data) {
 
     if (player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
-        playersWhoActed.add(player.name);  // ✅ Ensure BB is counted
+        playersWhoActed.add(player.name);
 
         let nextPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         if (nextPlayerIndex === -1) {
@@ -642,6 +642,7 @@ function handleCheck(data) {
             console.log(`Next player: ${players[currentPlayerIndex].name}`);
             broadcastGameState();
         }
+        bettingRound(); // Add this line!
     } else {
         console.log("Check not allowed, there is a bet to match.");
     }
