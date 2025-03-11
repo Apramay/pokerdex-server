@@ -189,25 +189,27 @@ function bettingRound() {
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
-    if (activePlayers.length <= 1) return true;
+    if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
 
     const allBetsMatched = activePlayers.every(player =>
         player.currentBet === currentBet || player.status === "folded"
     );
 
     const allPlayersActed = playersWhoActed.size >= activePlayers.length;
+    const bigBlindIndex = (dealerIndex + 2) % players.length;
+    const bigBlindHasActed = playersWhoActed.has(players[bigBlindIndex].name);
+    const bigBlindChecked = players[bigBlindIndex].currentBet === currentBet && players[bigBlindIndex].status === "active";
 
-    // ✅ Add condition to prevent premature round end if the big blind has not acted.
-    const bigBlindHasActed = playersWhoActed.has(players[(dealerIndex + 2) % players.length].name);
-
-    if (allBetsMatched && allPlayersActed && bigBlindHasActed) {
-        console.log("✅ All players have acted. Ending betting round.");
+    // ✅ Condition to end round if big blind checked as the last action
+    if (allBetsMatched && (allPlayersActed || bigBlindChecked)) {
+        console.log("✅ Betting round is over.");
         playersWhoActed.clear();
         return true;
     }
 
     return false;
 }
+
 
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
