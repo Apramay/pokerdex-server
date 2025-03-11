@@ -213,7 +213,7 @@ function getNextPlayerIndex(currentIndex) {
     }
 
     let nextIndex = (currentIndex + 1) % players.length;
-    let initialIndex = currentIndex; // Store who originally acted
+    let initialIndex = currentIndex;
     let attempts = 0;
 
     while (
@@ -222,17 +222,6 @@ function getNextPlayerIndex(currentIndex) {
     ) {
         nextIndex = (nextIndex + 1) % players.length;
         attempts++;
-
-        // If we looped back to the original raiser, stop
-        if (nextIndex === initialIndex) {
-            if(isBettingRoundOver()){
-                console.log("✅ All players have acted. Moving to the next round.");
-                setTimeout(nextRound, 1000);
-                return -1;
-            } else {
-                return nextIndex;
-            }
-        }
     }
 
     if (attempts >= players.length) {
@@ -241,8 +230,13 @@ function getNextPlayerIndex(currentIndex) {
         return -1;
     }
 
+    if(isBettingRoundOver()){
+        return -1;
+    }
+
     return nextIndex;
 }
+
 function startFlopBetting() {
     currentBet = 0;
     currentPlayerIndex = (dealerIndex + 1) % players.length;
