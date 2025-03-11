@@ -115,8 +115,10 @@ function setupBlinds() {
     currentPlayerIndex = (bigBlindIndex + 1) % players.length;
 
     playersWhoActed.clear();
-    playersWhoActed.add(players[smallBlindIndex].name); // Add small blind to acted players
-    playersWhoActed.add(players[bigBlindIndex].name); // Add big blind to acted players
+    playersWhoActed.add(players[smallBlindIndex].name);
+    playersWhoActed.add(players[bigBlindIndex].name);
+
+    console.log(`setupBlinds: smallBlindIndex=${smallBlindIndex}, bigBlindIndex=${bigBlindIndex}, currentBet=${currentBet}, currentPlayerIndex=${currentPlayerIndex}`);
 
     broadcastGameState();
     broadcast({ type: "blindsPosted", smallBlind: players[smallBlindIndex].name, bigBlind: players[bigBlindIndex].name });
@@ -155,7 +157,7 @@ function shuffleDeck(deck) {
 }
 
 function bettingRound() {
-    console.log("Starting betting round...");
+    console.log("Starting betting round... currentPlayerIndex: " + currentPlayerIndex);
 
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
@@ -257,7 +259,7 @@ function startFlopBetting() {
 }
 
 function playerAction(player) {
-    console.log(`${player.name}, it's your turn to act.`);
+    console.log(`${player.name}, it's your turn to act. currentPlayerIndex: ${currentPlayerIndex}`);
 
     let options = [];
     if (currentBet === 0 || player.currentBet === currentBet) {
@@ -623,9 +625,11 @@ function handleCall(data) {
     }
 
     playersWhoActed.add(player.name);
-    console.log(`${player.name} called. Pot: ${pot}, Current bet: ${currentBet}, playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}`);
+    console.log(`${player.name} called. Pot: ${pot}, Current bet: ${currentBet}, playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}, currentPlayerIndex before getNext: ${currentPlayerIndex}`);
 
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+    console.log(`handleCall: currentPlayerIndex after getNext: ${currentPlayerIndex}`);
+
     broadcastGameState();
 }
 
