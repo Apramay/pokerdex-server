@@ -158,17 +158,26 @@ function shuffleDeck(deck) {
 
 function bettingRound() {
     console.log("Starting betting round...");
+
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
-    if (activePlayers.length <= 1 || isBettingRoundOver()) {
-        console.log("Betting round over, moving to next round.");
+    // ✅ If only one active player remains, move to the next round immediately.
+    if (activePlayers.length <= 1) {
+        console.log("Only one player left, moving to next round.");
+        setTimeout(nextRound, 1000);
+        return;
+    }
+
+    // ✅ Corrected: Don't check `isBettingRoundOver()` too early.
+    if (playersWhoActed.size >= activePlayers.length && isBettingRoundOver()) {
+        console.log("All players have acted. Betting round is over.");
         setTimeout(nextRound, 1000);
         return;
     }
 
     const player = players[currentPlayerIndex];
 
-    // Ensure the player actually has a turn
+    // ✅ Ensure skipping only if player has acted AND matched the current bet
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         bettingRound(); // Continue to next player
@@ -177,24 +186,10 @@ function bettingRound() {
 
     console.log(`Waiting for player ${player.name} to act...`);
 
-    // ✅ Fix: Broadcast player turn, replacing "bigBlindAction"
-    player.ws.send(JSON.stringify({
-        type: "playerTurn",
-        message: `It's your turn, ${player.name}.`,
-        options: determineAvailableActions(player)
-    }));
+    // ✅ Ensures UI correctly prompts player action
+    playerAction(player);
 }
 
-// Helper function to determine actions based on game state
-function determineAvailableActions(player) {
-    let options = [];
-    if (currentBet === 0 || player.currentBet === currentBet) {
-        options.push("check", "bet");
-    } else {
-        options.push("call", "fold", "raise");
-    }
-    return options;
-}
 
 
 
