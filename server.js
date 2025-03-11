@@ -155,6 +155,7 @@ function shuffleDeck(deck) {
     }
     return deck;
 }
+
 function bettingRound() {
     console.log("Starting betting round...");
 
@@ -166,7 +167,6 @@ function bettingRound() {
         return;
     }
 
-    // ✅ If betting is complete, move to next round
     if (isBettingRoundOver()) {
         console.log("✅ Betting round is complete. Moving to next phase.");
         setTimeout(nextRound, 1000);
@@ -175,8 +175,7 @@ function bettingRound() {
 
     const player = players[currentPlayerIndex];
 
-    // ✅ If player has already acted and matched the bet, skip to next
-    if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
+    if (!player || player.status !== "active" || player.tokens === 0 || player.allIn) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         bettingRound();
         return;
@@ -185,25 +184,28 @@ function bettingRound() {
     console.log(`Waiting for player ${player.name} to act...`);
     playerAction(player);
 }
+
+    console.log(`Waiting for player ${player.name} to act...`);
+    playerAction(player);
+}
+
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
     if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
 
-    // ✅ Betting round is over when all players have either:
-    // 1. Called (matched the currentBet)
-    // 2. Folded
-    // 3. Checked (if no bet was made)
+    // ✅ Betting round is over when all active players:
+    // - Have acted at least once
+    // - Have either matched the current bet, folded, or checked
     const allBetsMatched = activePlayers.every(player =>
         player.currentBet === currentBet || player.status === "folded"
     );
 
-    // ✅ Ensure the round also ends if all **active** players have acted
     const allPlayersActed = playersWhoActed.size >= activePlayers.length;
 
     if (allBetsMatched && allPlayersActed) {
         console.log("✅ All players have acted. Ending betting round.");
-        playersWhoActed.clear(); // Reset for the next round
+        playersWhoActed.clear(); // Reset for next round
         return true;
     }
 
@@ -655,15 +657,15 @@ function handleCheck(data) {
 
     if (currentBet === 0 || player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
-        playersWhoActed.add(player.name); // ✅ Mark player as having acted
+        playersWhoActed.add(player.name);
 
         // ✅ Move to the next player
-        let nextPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        if (nextPlayerIndex === -1) {
-            console.log("All players have checked/called. Moving to next round.");
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+
+        if (isBettingRoundOver()) {
+            console.log("✅ All players have checked/called. Moving to next round.");
             setTimeout(nextRound, 1000);
         } else {
-            currentPlayerIndex = nextPlayerIndex;
             console.log(`Next player: ${players[currentPlayerIndex].name}`);
             broadcastGameState();
         }
