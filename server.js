@@ -298,7 +298,36 @@ function nextRound() {
     setTimeout(startFlopBetting, 1000);
 }
 
+function endRound() {
+    if (round === 0) { // Preflop
+        // Check if there were any raises
+        const raises = players.filter(player => player.currentBet > bigBlindAmount);
+        if (raises.length === 0) {
+            // No raises, check if BB checked
+            const bigBlind = players.find(player => player.isBigBlind);
+            if (bigBlind && playersWhoActed.has(bigBlind.name)) {
+                // BB checked, end the round
+                console.log("Preflop round ended with BB check.");
+                setTimeout(nextRound, 1000);
+                return;
+            }
+        }
+    }
 
+    // Check if all active players have matched the current bet
+    const activePlayers = players.filter(player => player.status === "active");
+    if (activePlayers.every(player => player.currentBet === currentBet)) {
+        // All active players have called, end the round
+        console.log("Round ended with all active players calling.");
+        setTimeout(nextRound, 1000);
+        return;
+    }
+
+    // If neither condition is met, do nothing (continue the round)
+    console.log("Round not ended.");
+
+    broadcastGameState();
+}
 
 function showdown() {
     console.log("Showdown!");
