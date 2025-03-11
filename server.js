@@ -268,13 +268,12 @@ function playerAction(player) {
     }));
 }
 
-
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
 
     currentBet = 0;
     players.forEach(player => (player.currentBet = 0));
-    playersWhoActed.clear();
+    playersWhoActed.clear(); // Ensure playersWhoActed is cleared at the start of each round
 
     if (round === 0) {
         round++;
