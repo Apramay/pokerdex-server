@@ -113,13 +113,18 @@ function setupBlinds() {
 
     currentBet = bigBlindAmount;
     currentPlayerIndex = (bigBlindIndex + 1) % players.length;
-
+    
     playersWhoActed.clear();
-    playersWhoActed.delete(players[bigBlindIndex].name); // Remove big blind from acted set
 
     broadcastGameState();
     broadcast({ type: "blindsPosted", smallBlind: players[smallBlindIndex].name, bigBlind: players[bigBlindIndex].name });
-    setTimeout(bettingRound, 500);
+setTimeout(() => {
+    if (currentPlayerIndex === (dealerIndex + 2) % players.length) {
+        bigBlindCheckRaiseOption();
+    } else {
+        bettingRound();
+    }
+}, 500);
 }
 
 
@@ -136,7 +141,26 @@ function postBlind(player, amount) {
     }
     console.log(`${player.name} posts ${blindAmount}.`);
 }
+function bigBlindCheckRaiseOption() {
+    let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
+    if (!bigBlindPlayer || bigBlindPlayer.status !== "active") return;
 
+    if (currentBet === bigBlindAmount && !playersWhoActed.has(bigBlindPlayer.name)) { 
+       console.log(`${bigBlindPlayer.name}, you can check or bet.`);
+        bigBlindPlayer.ws.send(JSON.stringify({
+            type: "bigBlindAction",
+            message: `${bigBlindPlayer.name}, you can check or bet.`,
+            options: ["check", "bet"]
+        }));
+    } else if (!playersWhoActed.has(bigBlindPlayer.name)) {
+        console.log(`${bigBlindPlayer.name}, you must call or fold.`);
+        bigBlindPlayer.ws.send(JSON.stringify({
+            type: "bigBlindAction",
+            message: `${bigBlindPlayer.name}, you must call or fold.`,
+            options: ["call", "fold", "raise"]
+        }));
+    }
+}
 
 // Function to deal a hand of cards to a player
 function dealHand(deck, numCards) {
@@ -157,73 +181,76 @@ function shuffleDeck(deck) {
 }
 function bettingRound() {
     console.log("Starting betting round...");
-
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
-
-    if (activePlayers.length <= 1) {
-        console.log("Only one player left, moving to next round.");
+    if (activePlayers.length <= 1 || isBettingRoundOver()) {
+        console.log("Betting round over, moving to next round.");
         setTimeout(nextRound, 1000);
         return;
     }
-
-    if (isBettingRoundOver()) {
-        console.log("✅ Betting round is complete. Moving to next phase.");
-        setTimeout(nextRound, 1000);
-        return;
-    }
-
     const player = players[currentPlayerIndex];
-
+    if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
+        console.log(`${player.name} has already acted. Skipping...`);
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+        bettingRound();
+        return;
+    }
     console.log(`Waiting for player ${player.name} to act...`);
-    playerAction(player);
+    broadcast({ type: "playerTurn", playerName: player.name });
 }
-
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
+    
+    if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
+    
+    // ✅ Move to the next round as soon as all players have either:
+    // 1. Called (matched the currentBet)
+    // 2. Folded
+    const allBetsMatched = activePlayers.every(player => 
+        player.currentBet === currentBet || player.status === "folded"
+    );
 
-    if (activePlayers.length <= 1) {
-        return true; // Only one player left, round ends immediately
-    }
-
-    // Ensure all active players have matched the current bet
-    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
-
-    // If all active players have called or folded, and all active players have acted, the round is over
-    if (allCalled && playersWhoActed.size >= activePlayers.length) {
+    if (allBetsMatched) {
+        playersWhoActed.clear(); // Reset for the next round
         return true;
     }
 
     return false;
 }
 
-function isBettingRoundOver() {
-    let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
-    if (activePlayers.length <= 1) {return true; }// Only one player left, round ends immediately
-    // Ensure all active players have matched the current bet
-    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
-
-    // If all active players have called or folded, the round is over
-    if (allCalled && playersWhoActed.size >= activePlayers.length) {
-        return true;
-    }
-    return false;
-}
 
 function getNextPlayerIndex(currentIndex) {
+    let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
+    
+    if (activePlayers.length <= 1) {
+        console.log("Only one player remains, moving to next round.");
+        setTimeout(nextRound, 1000);
+        return -1;
+    }
+
     let nextIndex = (currentIndex + 1) % players.length;
+    let initialIndex = currentIndex; // Store who originally acted
     let attempts = 0;
 
     while (
-        (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) &&
-        attempts < players.length
+        (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
+        && attempts < players.length
     ) {
         nextIndex = (nextIndex + 1) % players.length;
         attempts++;
+
+        // If we looped back to the original raiser, stop
+        if (nextIndex === initialIndex) {
+            console.log("✅ All players have acted. Moving to the next round.");
+            setTimeout(nextRound, 1000);
+            return -1;
+        }
     }
 
     if (attempts >= players.length) {
-        return -1; // Indicate no valid next player
+        console.warn("⚠ No valid player found. Ending round.");
+        setTimeout(nextRound, 1000);
+        return -1;
     }
 
     return nextIndex;
@@ -231,51 +258,17 @@ function getNextPlayerIndex(currentIndex) {
 
 function startFlopBetting() {
     currentBet = 0;
-    currentPlayerIndex = (dealerIndex + 1) % players.length;
-    playersWhoActed.clear();
-    bettingRound();  // ✅ Ensure betting actually starts
-}
-
-function playerAction(player) {
-    console.log(`${player.name}, it's your turn to act.`);
-
-    let options = [];
-
-    if (currentBet > 0 && player.currentBet < currentBet) {
-        options.push("call", "fold", "raise");
-    } else {
-        options.push("check", "raise");
-    }
-
-    player.ws.send(JSON.stringify({
-        type: "playerTurn",
-        message: `It's your turn, ${player.name}.`,
-        options: options
-    }));
-}
-
-function bigBlindCheckRaiseOption() {
-    let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
-
-    let options = [];
     
-    if (currentBet === bigBlindAmount) {
-        // No raises occurred, big blind can check or bet
-        options.push("check", "bet");
-    } else {
-        // Someone raised, big blind must call or fold
-        options.push("call", "fold", "raise");
+    // ✅ Ensure betting starts with the first active player left of the dealer
+    let startIndex = (dealerIndex + 1) % players.length;
+    while (players[startIndex].status !== "active") {
+        startIndex = (startIndex + 1) % players.length;
     }
+    currentPlayerIndex = startIndex;
 
-    bigBlindPlayer.ws.send(JSON.stringify({
-        type: "bigBlindAction",
-        message: currentBet === bigBlindAmount
-            ? `${bigBlindPlayer.name}, you can check or bet.`
-            : `${bigBlindPlayer.name}, you must call or fold.`,
-        options: options
-    }));
+    playersWhoActed.clear();
+    broadcastGameState();
 }
-
 
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
@@ -285,24 +278,17 @@ function nextRound() {
     playersWhoActed.clear();
 
     if (round === 0) {
-        round++;
-        tableCards = dealHand(deckForGame, 3);
+        round = 1;
+        tableCards = dealHand(deckForGame, 3); // Flop
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(tableCards)}` });
-
-        // Betting starts with Small Blind after the flop
-        currentPlayerIndex = (dealerIndex + 1) % players.length;
     } else if (round === 1) {
-        round++;
-        if (deckForGame.length > 0) {
-            tableCards.push(dealHand(deckForGame, 1)[0]);
-            broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
-        }
+        round = 2;
+        tableCards.push(dealHand(deckForGame, 1)[0]); // Turn
+        broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
     } else if (round === 2) {
-        round++;
-        if (deckForGame.length > 0) {
-            tableCards.push(dealHand(deckForGame, 1)[0]);
-            broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
-        }
+        round = 3;
+        tableCards.push(dealHand(deckForGame, 1)[0]); // River
+        broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
     } else if (round === 3) {
         showdown();
         return;
@@ -311,6 +297,8 @@ function nextRound() {
     broadcastGameState();
     setTimeout(startFlopBetting, 1000);
 }
+
+
 
 function showdown() {
     console.log("Showdown!");
@@ -530,6 +518,8 @@ wss.on('connection', function connection(ws) {
                 broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
             } else if (data.type === 'startGame') {
                 startGame();
+            } else if (data.type === 'bet') {
+                handleBet(data);
             } else if (data.type === 'raise') {
                 handleRaise(data);
             } else if (data.type === 'call') {
@@ -553,6 +543,32 @@ wss.on('connection', function connection(ws) {
 });
 
 // Action handlers
+function handleBet(data) {
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
+
+    const betAmount = parseInt(data.amount);
+
+    if (betAmount > player.tokens) {
+        console.error("Not enough tokens:", data.playerName);
+        return;
+    }
+
+    player.tokens -= betAmount;
+    player.currentBet = betAmount;
+    pot += betAmount;
+    currentBet = betAmount; // Update the current bet
+
+    // Move to the next player
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+
+    // Broadcast the updated game state
+    broadcastGameState();
+}
+
 function handleRaise(data) {
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
@@ -561,32 +577,28 @@ function handleRaise(data) {
     }
 
     const raiseAmount = parseInt(data.amount);
-    let totalBet = raiseAmount;
 
-    if (currentBet === 0) { // Handling initial bet
-        if (raiseAmount > player.tokens) {
-            console.error("Not enough tokens:", data.playerName);
-            return;
-        }
-    } else {
-        if (raiseAmount <= currentBet || raiseAmount > player.tokens) {
-            console.error("Invalid raise amount:", data.playerName);
-            return;
-        }
-        totalBet = raiseAmount;
+    if (raiseAmount <= currentBet || raiseAmount > player.tokens) {
+        console.error("Invalid raise amount:", data.playerName);
+        return;
     }
 
+    const totalBet = raiseAmount;
     player.tokens -= totalBet - player.currentBet;
     pot += totalBet - player.currentBet;
     player.currentBet = totalBet;
     currentBet = totalBet;
 
-    playersWhoActed.add(player.name);
+    // ✅ Mark this player as having acted
+    playersWhoActed.add(player.name); 
 
+    // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
+    // Broadcast the updated game state
     broadcastGameState();
 }
+
 
 function handleCall(data) {
     const player = players.find(p => p.name === data.playerName);
@@ -596,9 +608,6 @@ function handleCall(data) {
     }
 
     let amount = Math.min(currentBet - player.currentBet, player.tokens);
-    if (amount < 0) {
-        amount = 0;
-    }
     player.tokens -= amount;
     player.currentBet += amount;
     pot += amount;
@@ -606,8 +615,10 @@ function handleCall(data) {
         player.allIn = true;
     }
 
+    // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
+    // Broadcast the updated game state
     broadcastGameState();
 }
 
@@ -634,25 +645,24 @@ function handleCheck(data) {
         return;
     }
 
-    if (player.currentBet === currentBet) {
+    if (currentBet === 0 || player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
-        playersWhoActed.add(player.name);
+        playersWhoActed.add(player.name); // ✅ Mark player as having acted
 
-        let nextPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        if (nextPlayerIndex === -1) {
-            console.log("✅ All players have checked/called. Moving to next round.");
+        // ✅ Move to the next player
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+
+        if (isBettingRoundOver()) {
+            console.log("All players have checked/called. Moving to next round.");
             setTimeout(nextRound, 1000);
         } else {
-            currentPlayerIndex = nextPlayerIndex;
             console.log(`Next player: ${players[currentPlayerIndex].name}`);
             broadcastGameState();
         }
-        bettingRound(); // Add this line!
     } else {
         console.log("Check not allowed, there is a bet to match.");
     }
 }
-
 
 // Start the server
 server.listen(process.env.PORT || 8080, () => {
