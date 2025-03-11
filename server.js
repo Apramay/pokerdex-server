@@ -155,6 +155,16 @@ function shuffleDeck(deck) {
     }
     return deck;
 }
+function determineAvailableActions(player) {
+    let options = [];
+    if (currentBet === 0 || player.currentBet === currentBet) {
+        options.push("check", "bet");
+    } else {
+        options.push("call", "fold", "raise");
+    }
+    return options;
+}
+
 function bettingRound() {
     console.log("Starting betting round...");
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
