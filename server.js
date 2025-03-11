@@ -157,22 +157,39 @@ function shuffleDeck(deck) {
 }
 function bettingRound() {
     console.log("Starting betting round...");
+
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
-    if (activePlayers.length <= 1 || isBettingRoundOver()) {
-        console.log("Betting round over, moving to next round.");
+
+    // ✅ If only one active player remains, move to the next round immediately.
+    if (activePlayers.length <= 1) {
+        console.log("Only one player left, moving to next round.");
         setTimeout(nextRound, 1000);
         return;
     }
-    const player = players[currentPlayerIndex];
-    if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
-        console.log(`${player.name} has already acted. Skipping...`);
-        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        bettingRound();
+
+    // ✅ Corrected: Don't check `isBettingRoundOver()` too early.
+    if (playersWhoActed.size >= activePlayers.length && isBettingRoundOver()) {
+        console.log("All players have acted. Betting round is over.");
+        setTimeout(nextRound, 1000);
         return;
     }
+
+    const player = players[currentPlayerIndex];
+
+    // ✅ Ensure skipping only if player has acted AND matched the current bet
+    if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+        bettingRound(); // Continue to next player
+        return;
+    }
+
     console.log(`Waiting for player ${player.name} to act...`);
-    broadcast({ type: "playerTurn", playerName: player.name });
+
+    // ✅ Ensures UI correctly prompts player action
+    playerAction(player);
 }
+
+
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
     
