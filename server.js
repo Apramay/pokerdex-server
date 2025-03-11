@@ -599,7 +599,6 @@ function handleRaise(data) {
     broadcastGameState();
 }
 
-
 function handleCall(data) {
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
@@ -615,10 +614,10 @@ function handleCall(data) {
         player.allIn = true;
     }
 
-    // Move to the next player
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+    playersWhoActed.add(player.name);
+    console.log(`${player.name} called. Pot: ${pot}, Current bet: ${currentBet}, playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}`);
 
-    // Broadcast the updated game state
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
     broadcastGameState();
 }
 
