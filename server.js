@@ -166,46 +166,49 @@ function bettingRound() {
         return;
     }
 
-    // Ensure all active players act before moving to the next round
-    if (playersWhoActed.size >= activePlayers.length && isBettingRoundOver()) {
-        console.log("All players have acted. Betting round is over.");
+    // ✅ If betting is complete, move to next round
+    if (isBettingRoundOver()) {
+        console.log("✅ Betting round is complete. Moving to next phase.");
         setTimeout(nextRound, 1000);
         return;
     }
 
     const player = players[currentPlayerIndex];
 
-    // If player has acted and matched the bet, move to next
+    // ✅ If player has already acted and matched the bet, skip to next
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        bettingRound(); // Continue to next player
+        bettingRound();
         return;
     }
 
     console.log(`Waiting for player ${player.name} to act...`);
     playerAction(player);
 }
-
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
-    
+
     if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
-    
-    // ✅ Move to the next round as soon as all players have either:
+
+    // ✅ Betting round is over when all players have either:
     // 1. Called (matched the currentBet)
     // 2. Folded
-    const allBetsMatched = activePlayers.every(player => 
+    // 3. Checked (if no bet was made)
+    const allBetsMatched = activePlayers.every(player =>
         player.currentBet === currentBet || player.status === "folded"
     );
 
-    if (allBetsMatched) {
+    // ✅ Ensure the round also ends if all **active** players have acted
+    const allPlayersActed = playersWhoActed.size >= activePlayers.length;
+
+    if (allBetsMatched && allPlayersActed) {
+        console.log("✅ All players have acted. Ending betting round.");
         playersWhoActed.clear(); // Reset for the next round
         return true;
     }
 
     return false;
 }
-
 
 
 function getNextPlayerIndex(currentIndex) {
