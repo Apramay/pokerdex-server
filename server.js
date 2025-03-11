@@ -116,7 +116,9 @@ function setupBlinds() {
 
     playersWhoActed.clear();
     playersWhoActed.add(players[smallBlindIndex].name);
+    console.log(`setupBlinds: Added ${players[smallBlindIndex].name} to playersWhoActed. playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}`);
     playersWhoActed.add(players[bigBlindIndex].name);
+    console.log(`setupBlinds: Added ${players[bigBlindIndex].name} to playersWhoActed. playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}`);
 
     console.log(`setupBlinds: smallBlindIndex=${smallBlindIndex}, bigBlindIndex=${bigBlindIndex}, currentBet=${currentBet}, currentPlayerIndex=${currentPlayerIndex}`);
 
@@ -203,9 +205,7 @@ function isBettingRoundOver() {
     const allPlayersActed = playersWhoActed.size >= activePlayers.length;
 
     console.log(`isBettingRoundOver: allBetsMatched=${allBetsMatched}, allPlayersActed=${allPlayersActed}, playersWhoActed=${JSON.stringify(Array.from(playersWhoActed))}, activePlayers.length=${activePlayers.length}, currentBet=${currentBet}`);
-    activePlayers.forEach(player => {
-        console.log(`isBettingRoundOver: ${player.name} currentBet=${player.currentBet}`);
-    });
+    console.log(`isBettingRoundOver: activePlayers.length: ${activePlayers.length}, playersWhoActed.size: ${playersWhoActed.size}`);
 
     if (allBetsMatched && allPlayersActed) {
         console.log("isBettingRoundOver: ✅ All players have acted. Ending betting round.");
@@ -276,18 +276,18 @@ function playerAction(player) {
 }
 
 function nextRound() {
-    console.log("nextRound() called. Current round:", round);
+    console.log(`nextRound: playersWhoActed before clear: ${JSON.stringify(Array.from(playersWhoActed))}`);
+    playersWhoActed.clear();
+    console.log(`nextRound: playersWhoActed after clear: ${JSON.stringify(Array.from(playersWhoActed))}`);
 
     currentBet = 0;
     players.forEach(player => (player.currentBet = 0));
-    playersWhoActed.clear(); // Ensure playersWhoActed is cleared at the start of each round
 
     if (round === 0) {
         round++;
         tableCards = dealHand(deckForGame, 3);
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(tableCards)}` });
 
-        // Betting starts with Small Blind after the flop
         currentPlayerIndex = (dealerIndex + 1) % players.length;
     } else if (round === 1) {
         round++;
@@ -570,12 +570,12 @@ function handleBet(data) {
     player.tokens -= betAmount;
     player.currentBet = betAmount;
     pot += betAmount;
-    currentBet = betAmount; // Update the current bet
+    currentBet = betAmount;
 
-    // Move to the next player
+    playersWhoActed.add(player.name);
+    console.log(`handleBet: Added ${player.name} to playersWhoActed. playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}`);
+
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-    // Broadcast the updated game state
     broadcastGameState();
 }
 
@@ -599,13 +599,10 @@ function handleRaise(data) {
     player.currentBet = totalBet;
     currentBet = totalBet;
 
-    // ✅ Mark this player as having acted
-    playersWhoActed.add(player.name); 
+    playersWhoActed.add(player.name);
+    console.log(`handleRaise: Added ${player.name} to playersWhoActed. playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}`);
 
-    // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-    // Broadcast the updated game state
     broadcastGameState();
 }
 
@@ -625,7 +622,7 @@ function handleCall(data) {
     }
 
     playersWhoActed.add(player.name);
-    console.log(`${player.name} called. Pot: ${pot}, Current bet: ${currentBet}, playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}, currentPlayerIndex before getNext: ${currentPlayerIndex}`);
+    console.log(`handleCall: Added ${player.name} to playersWhoActed. playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}, currentPlayerIndex before getNext: ${currentPlayerIndex}`);
 
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
     console.log(`handleCall: currentPlayerIndex after getNext: ${currentPlayerIndex}`);
@@ -659,8 +656,8 @@ function handleCheck(data) {
     if (currentBet === 0 || player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
         playersWhoActed.add(player.name);
+        console.log(`handleCheck: Added ${player.name} to playersWhoActed. playersWhoActed: ${JSON.stringify(Array.from(playersWhoActed))}`);
 
-        // ✅ Move to the next player
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
         if (isBettingRoundOver()) {
@@ -674,7 +671,6 @@ function handleCheck(data) {
         console.log("Check not allowed, there is a bet to match.");
     }
 }
-
 
 // Start the server
 server.listen(process.env.PORT || 8080, () => {
