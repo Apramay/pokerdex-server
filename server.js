@@ -113,17 +113,15 @@ function setupBlinds() {
 
     currentBet = bigBlindAmount;
     currentPlayerIndex = (bigBlindIndex + 1) % players.length;
-    
+
     playersWhoActed.clear();
+    playersWhoActed.add(players[smallBlindIndex].name); // Add small blind to acted players
+    playersWhoActed.add(players[bigBlindIndex].name); // Add big blind to acted players
 
     broadcastGameState();
     broadcast({ type: "blindsPosted", smallBlind: players[smallBlindIndex].name, bigBlind: players[bigBlindIndex].name });
-setTimeout(bettingRound, 500);
-
+    setTimeout(bettingRound, 500);
 }
-
-
-
 
 // Function to post blinds
 function postBlind(player, amount) {
@@ -194,9 +192,6 @@ function isBettingRoundOver() {
 
     if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
 
-    // ✅ Betting round is over when all active players:
-    // - Have acted at least once
-    // - Have either matched the current bet, folded, or checked
     const allBetsMatched = activePlayers.every(player =>
         player.currentBet === currentBet || player.status === "folded"
     );
@@ -212,10 +207,9 @@ function isBettingRoundOver() {
     return false;
 }
 
-
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
-    
+
     if (activePlayers.length <= 1) {
         console.log("Only one player remains, moving to next round.");
         setTimeout(nextRound, 1000);
@@ -227,17 +221,21 @@ function getNextPlayerIndex(currentIndex) {
     let attempts = 0;
 
     while (
-        (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
-        && attempts < players.length
+        (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) &&
+        attempts < players.length
     ) {
         nextIndex = (nextIndex + 1) % players.length;
         attempts++;
 
         // If we looped back to the original raiser, stop
         if (nextIndex === initialIndex) {
-            console.log("✅ All players have acted. Moving to the next round.");
-            setTimeout(nextRound, 1000);
-            return -1;
+            if(isBettingRoundOver()){
+                console.log("✅ All players have acted. Moving to the next round.");
+                setTimeout(nextRound, 1000);
+                return -1;
+            } else {
+                return nextIndex;
+            }
         }
     }
 
@@ -249,7 +247,6 @@ function getNextPlayerIndex(currentIndex) {
 
     return nextIndex;
 }
-
 function startFlopBetting() {
     currentBet = 0;
     currentPlayerIndex = (dealerIndex + 1) % players.length;
