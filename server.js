@@ -155,15 +155,6 @@ function shuffleDeck(deck) {
     }
     return deck;
 }
-function determineAvailableActions(player) {
-    let options = [];
-    if (currentBet === 0 || player.currentBet === currentBet) {
-        options.push("check", "bet");
-    } else {
-        options.push("call", "fold", "raise");
-    }
-    return options;
-}
 
 function bettingRound() {
     console.log("Starting betting round...");
@@ -177,20 +168,34 @@ function bettingRound() {
 
     const player = players[currentPlayerIndex];
 
+    // Ensure the player actually has a turn
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        bettingRound();
+        bettingRound(); // Continue to next player
         return;
     }
 
     console.log(`Waiting for player ${player.name} to act...`);
 
+    // ✅ Fix: Broadcast player turn, replacing "bigBlindAction"
     player.ws.send(JSON.stringify({
         type: "playerTurn",
         message: `It's your turn, ${player.name}.`,
         options: determineAvailableActions(player)
     }));
 }
+
+// Helper function to determine actions based on game state
+function determineAvailableActions(player) {
+    let options = [];
+    if (currentBet === 0 || player.currentBet === currentBet) {
+        options.push("check", "bet");
+    } else {
+        options.push("call", "fold", "raise");
+    }
+    return options;
+}
+
 
 
 
