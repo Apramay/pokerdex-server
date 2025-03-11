@@ -631,11 +631,11 @@ function handleCheck(data) {
 
     if (player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
-        playersWhoActed.add(player.name);
+        playersWhoActed.add(player.name);  // ✅ Ensure BB is counted
 
         let nextPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         if (nextPlayerIndex === -1) {
-            console.log("All players have checked/called. Moving to next round.");
+            console.log("✅ All players have checked/called. Moving to next round.");
             setTimeout(nextRound, 1000);
         } else {
             currentPlayerIndex = nextPlayerIndex;
@@ -646,6 +646,7 @@ function handleCheck(data) {
         console.log("Check not allowed, there is a bet to match.");
     }
 }
+
 
 // Start the server
 server.listen(process.env.PORT || 8080, () => {
