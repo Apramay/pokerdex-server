@@ -88,18 +88,41 @@ function startGame() {
 
 // Function to start a new hand
 function startNewHand() {
-    deckForGame = shuffleDeck(createDeck());
-    players.forEach(player => {
-        player.hand = dealHand(deckForGame, 2);
-        player.currentBet = 0;
-        player.status = "active";
-        player.allIn = false;
-    });
+    // Reset game state for a new hand
     tableCards = [];
     pot = 0;
     currentBet = 0;
-    round = 0;
-    setupBlinds();
+    playersWhoActed.clear();
+    deckForGame = shuffleDeck(createDeck());
+    round = 0; // Reset to preflop
+
+    // Move the dealer button
+    dealerIndex = (dealerIndex + 1) % players.length;
+
+    // Determine small blind and big blind indices
+    let smallBlindIndex = (dealerIndex + 1) % players.length;
+    let bigBlindIndex = (dealerIndex + 2) % players.length;
+    if (players.length === 2) {
+        bigBlindIndex = (dealerIndex + 1) % players.length;
+    }
+
+    // Reset player states and deal cards
+    players.forEach((player, index) => {
+        player.hand = dealHand(deckForGame, 2);
+        player.currentBet = 0;
+        player.status = "active"; // Reset player status
+        player.isSmallBlind = index === smallBlindIndex;
+        player.isBigBlind = index === bigBlindIndex;
+        player.chips -= player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
+        pot += player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
+        player.currentBet = player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
+    });
+
+    // Set the starting player (after the big blind)
+    currentPlayerIndex = (bigBlindIndex + 1) % players.length;
+
+    // Broadcast the updated game state
+    broadcastGameState();
 }
 
 // Function to set up blinds for the new hand
