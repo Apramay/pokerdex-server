@@ -234,13 +234,11 @@ function getNextPlayerIndex(currentIndex) {
 
 function startFlopBetting() {
     currentBet = 0;
-
-    // Betting starts from Small Blind
     currentPlayerIndex = (dealerIndex + 1) % players.length;
     playersWhoActed.clear();
-
-    bettingRound();
+    bettingRound();  // ✅ Ensure betting actually starts
 }
+
 
 
 function nextRound() {
@@ -251,15 +249,15 @@ function nextRound() {
     playersWhoActed.clear();
 
     if (round === 0) {
-        round = 1;
+        round++;
         tableCards = dealHand(deckForGame, 3); // Flop
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(tableCards)}` });
     } else if (round === 1) {
-        round = 2;
+        round++;
         tableCards.push(dealHand(deckForGame, 1)[0]); // Turn
         broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
     } else if (round === 2) {
-        round = 3;
+        round++;;
         tableCards.push(dealHand(deckForGame, 1)[0]); // River
         broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
     } else if (round === 3) {
