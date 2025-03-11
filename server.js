@@ -155,7 +155,6 @@ function shuffleDeck(deck) {
     }
     return deck;
 }
-
 function bettingRound() {
     console.log("Starting betting round...");
 
@@ -167,7 +166,7 @@ function bettingRound() {
         return;
     }
 
-    // Ensure all players have had a turn before moving on
+    // Ensure all active players act before moving to the next round
     if (playersWhoActed.size >= activePlayers.length && isBettingRoundOver()) {
         console.log("All players have acted. Betting round is over.");
         setTimeout(nextRound, 1000);
@@ -176,20 +175,16 @@ function bettingRound() {
 
     const player = players[currentPlayerIndex];
 
-    // If this player has already acted AND matched the current bet, move to the next one
+    // If player has acted and matched the bet, move to next
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        bettingRound();
+        bettingRound(); // Continue to next player
         return;
     }
 
     console.log(`Waiting for player ${player.name} to act...`);
     playerAction(player);
 }
-
-
-
-
 
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
