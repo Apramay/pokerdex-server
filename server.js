@@ -175,6 +175,9 @@ function bettingRound() {
 
     if (!player || player.status !== "active" || player.tokens === 0 || player.allIn) {
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+        if(currentPlayerIndex === -1){
+            return;
+        }
         bettingRound();
         return;
     }
