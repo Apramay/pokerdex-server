@@ -174,16 +174,26 @@ function bettingRound() {
 
     const player = players[currentPlayerIndex];
 
-    // ✅ If player has already acted and matched the bet, skip to next
-    // ✅ Added check for big blind to give them a chance to act.
-    if (playersWhoActed.has(player.name) && player.currentBet === currentBet && currentPlayerIndex !== (dealerIndex + 2) % players.length) {
-        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        bettingRound();
-        return;
-    }
-
     console.log(`Waiting for player ${player.name} to act...`);
     playerAction(player);
+}
+
+function isBettingRoundOver() {
+    let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
+
+    if (activePlayers.length <= 1) {
+        return true; // Only one player left, round ends immediately
+    }
+
+    // Ensure all active players have matched the current bet
+    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
+
+    // If all active players have called or folded, and all active players have acted, the round is over
+    if (allCalled && playersWhoActed.size >= activePlayers.length) {
+        return true;
+    }
+
+    return false;
 }
 
 function isBettingRoundOver() {
@@ -200,27 +210,22 @@ function isBettingRoundOver() {
     return false;
 }
 
-
-
 function getNextPlayerIndex(currentIndex) {
-    
     let nextIndex = (currentIndex + 1) % players.length;
     let attempts = 0;
 
     while (
-        (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
-        && attempts < players.length
+        (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) &&
+        attempts < players.length
     ) {
-       
-        if (nextIndex === currentIndex) {
-            console.log("✅ All players have acted. Moving to the next round.");
-            return -1;
-        }
         nextIndex = (nextIndex + 1) % players.length;
         attempts++;
     }
 
-    
+    if (attempts >= players.length) {
+        return -1; // Indicate no valid next player
+    }
+
     return nextIndex;
 }
 
