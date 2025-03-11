@@ -258,7 +258,7 @@ function playerAction(player) {
 
     let options = [];
     if (currentBet === 0 || player.currentBet === currentBet) {
-        options.push("check", "bet");
+        options.push("check", "raise"); // Replace "bet" with "raise"
     } else {
         options.push("call", "fold", "raise");
     }
@@ -524,8 +524,6 @@ wss.on('connection', function connection(ws) {
                 broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
             } else if (data.type === 'startGame') {
                 startGame();
-            } else if (data.type === 'bet') {
-                handleBet(data);
             } else if (data.type === 'raise') {
                 handleRaise(data);
             } else if (data.type === 'call') {
@@ -549,32 +547,6 @@ wss.on('connection', function connection(ws) {
 });
 
 // Action handlers
-function handleBet(data) {
-    const player = players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
-        return;
-    }
-
-    const betAmount = parseInt(data.amount);
-
-    if (betAmount > player.tokens) {
-        console.error("Not enough tokens:", data.playerName);
-        return;
-    }
-
-    player.tokens -= betAmount;
-    player.currentBet = betAmount;
-    pot += betAmount;
-    currentBet = betAmount; // Update the current bet
-
-    // Move to the next player
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-    // Broadcast the updated game state
-    broadcastGameState();
-}
-
 function handleRaise(data) {
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
@@ -583,28 +555,32 @@ function handleRaise(data) {
     }
 
     const raiseAmount = parseInt(data.amount);
+    let totalBet = raiseAmount;
 
-    if (raiseAmount <= currentBet || raiseAmount > player.tokens) {
-        console.error("Invalid raise amount:", data.playerName);
-        return;
+    if (currentBet === 0) { // Handling initial bet
+        if (raiseAmount > player.tokens) {
+            console.error("Not enough tokens:", data.playerName);
+            return;
+        }
+    } else {
+        if (raiseAmount <= currentBet || raiseAmount > player.tokens) {
+            console.error("Invalid raise amount:", data.playerName);
+            return;
+        }
+        totalBet = raiseAmount;
     }
 
-    const totalBet = raiseAmount;
     player.tokens -= totalBet - player.currentBet;
     pot += totalBet - player.currentBet;
     player.currentBet = totalBet;
     currentBet = totalBet;
 
-    // ✅ Mark this player as having acted
-    playersWhoActed.add(player.name); 
+    playersWhoActed.add(player.name);
 
-    // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
-    // Broadcast the updated game state
     broadcastGameState();
 }
-
 
 function handleCall(data) {
     const player = players.find(p => p.name === data.playerName);
@@ -614,6 +590,9 @@ function handleCall(data) {
     }
 
     let amount = Math.min(currentBet - player.currentBet, player.tokens);
+    if (amount < 0) {
+        amount = 0;
+    }
     player.tokens -= amount;
     player.currentBet += amount;
     pot += amount;
@@ -621,10 +600,8 @@ function handleCall(data) {
         player.allIn = true;
     }
 
-    // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
-    // Broadcast the updated game state
     broadcastGameState();
 }
 
@@ -651,11 +628,10 @@ function handleCheck(data) {
         return;
     }
 
-    if (currentBet === 0 || player.currentBet === currentBet) {
+    if (player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
-        playersWhoActed.add(player.name); // ✅ Mark player as having acted
+        playersWhoActed.add(player.name);
 
-        // ✅ Move to the next player
         let nextPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         if (nextPlayerIndex === -1) {
             console.log("All players have checked/called. Moving to next round.");
@@ -669,7 +645,6 @@ function handleCheck(data) {
         console.log("Check not allowed, there is a bet to match.");
     }
 }
-
 
 // Start the server
 server.listen(process.env.PORT || 8080, () => {
