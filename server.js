@@ -214,7 +214,6 @@ function isBettingRoundOver() {
 
     return false;
 }
-
 function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
 
