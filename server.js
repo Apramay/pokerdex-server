@@ -189,62 +189,38 @@ function bettingRound() {
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
-    if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
+    if (activePlayers.length <= 1) {return true; }// Only one player left, round ends immediately
+    // Ensure all active players have matched the current bet
+    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
 
-    const allBetsMatched = activePlayers.every(player =>
-        player.currentBet === currentBet || player.status === "folded"
-    );
-
-    const allPlayersActed = playersWhoActed.size >= activePlayers.length;
-    const bigBlindIndex = (dealerIndex + 2) % players.length;
-    const bigBlindHasActed = playersWhoActed.has(players[bigBlindIndex].name);
-    const bigBlindChecked = players[bigBlindIndex].currentBet === currentBet && players[bigBlindIndex].status === "active";
-
-    // ✅ Condition to end round if big blind checked as the last action
-    if (allBetsMatched && (allPlayersActed || bigBlindChecked)) {
-        console.log("✅ Betting round is over.");
-        playersWhoActed.clear();
+    // If all active players have called or folded, the round is over
+    if (allCalled && playersWhoActed.size >= activePlayers.length) {
         return true;
     }
-
     return false;
 }
 
 
-function getNextPlayerIndex(currentIndex) {
-    let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
-    
-    if (activePlayers.length <= 1) {
-        console.log("Only one player remains, moving to next round.");
-        setTimeout(nextRound, 1000);
-        return -1;
-    }
 
+function getNextPlayerIndex(currentIndex) {
+    
     let nextIndex = (currentIndex + 1) % players.length;
-    let initialIndex = currentIndex; // Store who originally acted
     let attempts = 0;
 
     while (
         (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
         && attempts < players.length
     ) {
-        nextIndex = (nextIndex + 1) % players.length;
-        attempts++;
-
-        // If we looped back to the original raiser, stop
-        if (nextIndex === initialIndex) {
+       
+        if (nextIndex === currentIndex) {
             console.log("✅ All players have acted. Moving to the next round.");
-            setTimeout(nextRound, 1000);
             return -1;
         }
+        nextIndex = (nextIndex + 1) % players.length;
+        attempts++;
     }
 
-    if (attempts >= players.length) {
-        console.warn("⚠ No valid player found. Ending round.");
-        setTimeout(nextRound, 1000);
-        return -1;
-    }
-
+    
     return nextIndex;
 }
 
@@ -259,15 +235,38 @@ function playerAction(player) {
     console.log(`${player.name}, it's your turn to act.`);
 
     let options = [];
-    if (currentBet === 0 || player.currentBet === currentBet) {
-        options.push("check", "raise"); // Replace "bet" with "raise"
-    } else {
+
+    if (currentBet > 0 && player.currentBet < currentBet) {
         options.push("call", "fold", "raise");
+    } else {
+        options.push("check", "raise");
     }
 
     player.ws.send(JSON.stringify({
         type: "playerTurn",
         message: `It's your turn, ${player.name}.`,
+        options: options
+    }));
+}
+
+function bigBlindCheckRaiseOption() {
+    let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
+
+    let options = [];
+    
+    if (currentBet === bigBlindAmount) {
+        // No raises occurred, big blind can check or bet
+        options.push("check", "bet");
+    } else {
+        // Someone raised, big blind must call or fold
+        options.push("call", "fold", "raise");
+    }
+
+    bigBlindPlayer.ws.send(JSON.stringify({
+        type: "bigBlindAction",
+        message: currentBet === bigBlindAmount
+            ? `${bigBlindPlayer.name}, you can check or bet.`
+            : `${bigBlindPlayer.name}, you must call or fold.`,
         options: options
     }));
 }
