@@ -256,6 +256,22 @@ function startFlopBetting() {
     bettingRound();  // ✅ Ensure betting actually starts
 }
 
+function playerAction(player) {
+    console.log(`${player.name}, it's your turn to act.`);
+
+    let options = [];
+    if (currentBet === 0 || player.currentBet === currentBet) {
+        options.push("check", "bet");
+    } else {
+        options.push("call", "fold", "raise");
+    }
+
+    player.ws.send(JSON.stringify({
+        type: "playerTurn",
+        message: `It's your turn, ${player.name}.`,
+        options: options
+    }));
+}
 
 
 function nextRound() {
