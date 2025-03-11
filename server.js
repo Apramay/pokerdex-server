@@ -183,10 +183,6 @@ function bettingRound() {
     playerAction(player);
 }
 
-    console.log(`Waiting for player ${player.name} to act...`);
-    playerAction(player);
-}
-
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
