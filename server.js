@@ -189,7 +189,10 @@ function bettingRound() {
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
-    if (activePlayers.length <= 1) return true;
+    if (activePlayers.length <= 1) {
+        console.log("isBettingRoundOver: Only one active player left.");
+        return true;
+    }
 
     const allBetsMatched = activePlayers.every(player =>
         player.currentBet === currentBet || player.status === "folded"
@@ -197,11 +200,13 @@ function isBettingRoundOver() {
 
     const allPlayersActed = playersWhoActed.size >= activePlayers.length;
 
-    console.log(`isBettingRoundOver: allBetsMatched=${allBetsMatched}, allPlayersActed=${allPlayersActed}, playersWhoActed=${JSON.stringify(Array.from(playersWhoActed))}, activePlayers.length=${activePlayers.length}, currentBet = ${currentBet}`);
+    console.log(`isBettingRoundOver: allBetsMatched=${allBetsMatched}, allPlayersActed=${allPlayersActed}, playersWhoActed=${JSON.stringify(Array.from(playersWhoActed))}, activePlayers.length=${activePlayers.length}, currentBet=${currentBet}`);
+    activePlayers.forEach(player => {
+        console.log(`isBettingRoundOver: ${player.name} currentBet=${player.currentBet}`);
+    });
 
     if (allBetsMatched && allPlayersActed) {
-        console.log("✅ All players have acted. Ending betting round.");
-        playersWhoActed.clear();
+        console.log("isBettingRoundOver: ✅ All players have acted. Ending betting round.");
         return true;
     }
 
@@ -212,7 +217,7 @@ function getNextPlayerIndex(currentIndex) {
     let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
 
     if (activePlayers.length <= 1) {
-        console.log("Only one player remains, moving to next round.");
+        console.log("getNextPlayerIndex: Only one player remains, moving to next round.");
         setTimeout(nextRound, 1000);
         return -1;
     }
@@ -230,17 +235,17 @@ function getNextPlayerIndex(currentIndex) {
     }
 
     if (attempts >= players.length) {
-        console.warn("⚠ No valid player found. Ending round.");
+        console.warn("getNextPlayerIndex: ⚠ No valid player found. Ending round.");
         setTimeout(nextRound, 1000);
         return -1;
     }
 
     if(isBettingRoundOver()){
-        console.log("Next Round is starting");
+        console.log("getNextPlayerIndex: Next Round is starting");
         return -1;
     }
 
-    console.log(`getNextPlayerIndex: Returning ${nextIndex}`);
+    console.log(`getNextPlayerIndex: Returning ${nextIndex}, currentIndex: ${currentIndex}`);
     return nextIndex;
 }
 
