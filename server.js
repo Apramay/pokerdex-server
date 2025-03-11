@@ -189,7 +189,7 @@ function bettingRound() {
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
 
-    if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
+    if (activePlayers.length <= 1) return true;
 
     const allBetsMatched = activePlayers.every(player =>
         player.currentBet === currentBet || player.status === "folded"
@@ -197,9 +197,11 @@ function isBettingRoundOver() {
 
     const allPlayersActed = playersWhoActed.size >= activePlayers.length;
 
+    console.log(`isBettingRoundOver: allBetsMatched=${allBetsMatched}, allPlayersActed=${allPlayersActed}, playersWhoActed=${JSON.stringify(Array.from(playersWhoActed))}, activePlayers.length=${activePlayers.length}, currentBet = ${currentBet}`);
+
     if (allBetsMatched && allPlayersActed) {
         console.log("✅ All players have acted. Ending betting round.");
-        playersWhoActed.clear(); // Reset for next round
+        playersWhoActed.clear();
         return true;
     }
 
@@ -234,9 +236,11 @@ function getNextPlayerIndex(currentIndex) {
     }
 
     if(isBettingRoundOver()){
+        console.log("Next Round is starting");
         return -1;
     }
 
+    console.log(`getNextPlayerIndex: Returning ${nextIndex}`);
     return nextIndex;
 }
 
