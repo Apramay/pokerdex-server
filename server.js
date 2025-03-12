@@ -275,7 +275,7 @@ function resetHand() {
     round = 0;
     tableCards = [];
     players.forEach(player => {
-        player.hand =;
+        player.hand = [];
         player.status = "active";
         player.allIn = false;
     });
