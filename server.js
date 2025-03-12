@@ -1,159 +1,102 @@
-const express = require("express");
-const http = require("http");
-const WebSocket = require("ws");
-const cors = require("cors");
+const express = require('express');
+const http = require('http');
+const { Server } = require("socket.io");
 
 const app = express();
-app.use(cors());
-
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const io = new Server(server, {
+    cors: {
+        origin: "*",  //  Allow all origins (for development - restrict in production)
+        methods: ["GET", "POST"]
+    }
+});
 
-// Card and game constants
 const suits = ["Hearts", "Diamonds", "Clubs", "Spades"];
 const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
-const rankValues = {
-    "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K": 13, "A": 14
-};
+const rankValues = { "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K": 13, "A": 14 };
 
-// Game state variables
-let players = [];
-let tableCards = [];
+function createDeck() {
+    const deck =;
+    for (const suit of suits) {
+        for (const rank of ranks) {
+            deck.push({ suit, rank });
+        }
+    }
+    return deck;
+}
+
+function shuffleDeck(deck) {
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck;
+}
+
+function dealCard(deck) {
+    return deck.pop();
+}
+
+function dealHand(deck, numCards) {
+    const hand =;
+    for (let i = 0; i < numCards; i++) {
+        hand.push(dealCard(deck));
+    }
+    return hand;
+}
+
+function createPlayer(name, tokens) {
+    return { name: name, tokens: tokens, hand:, currentBet: 0, status: "active", allIn: false };
+}
+
+let players =;
+let tableCards =;
 let pot = 0;
 let currentPlayerIndex = 0;
-let deckForGame = [];
+let deckForGame =;
 let currentBet = 0;
-let dealerIndex = 0;
 let round = 0;
 let smallBlindAmount = 10;
 let bigBlindAmount = 20;
-let playersWhoActed = new Set();
+let dealerIndex = 0;
+let playersWhoActed = new Set(); // Track players who acted
 
-// Function to create a new deck of cards
-function createDeck() {
-    let deck = [];
-    suits.forEach(suit => {
-        ranks.forEach(rank => {
-            deck.push({ suit, rank });
-        });
-    });
-    return deck.sort(() => Math.random() - 0.5);
-}
-
-// Function to broadcast data to all connected clients
-function broadcast(data) {
-    const jsonData = JSON.stringify(data);
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(jsonData);
-        }
-    });
-}
-
-// Function to broadcast the current game state to all clients
-function broadcastGameState() {
-    players.forEach(player => {
-        const privateGameState = {
-            type: "updateGameState",
-            players: players.map(({ ws, hand, ...playerData }) => ({
-                ...playerData, 
-                hand: player.name === playerData.name ? hand : [] // ✅ Only send their own hand
-            })),
-            tableCards,
-            pot,
-            currentBet,
-            round,
-            currentPlayerIndex,
-            dealerIndex
-        };
-
-        if (player.ws.readyState === WebSocket.OPEN) {
-            player.ws.send(JSON.stringify(privateGameState));
-        }
-    });
-}
-
-// Function to start the game
-function startGame() {
-    if (players.length < 2) {
-        console.log("❌ Not enough players to start the game.");
-        return;
-    }
+function startGame(playerNames, initialTokens) {
     deckForGame = shuffleDeck(createDeck());
+    players = playerNames.map((name) => createPlayer(name, initialTokens));
     dealerIndex = Math.floor(Math.random() * players.length);
     startNewHand();
-    broadcast({ type: "startGame" });
-    broadcastGameState();
 }
 
-// Function to start a new hand
 function startNewHand() {
-    // Reset game state for a new hand
-    tableCards = [];
-    pot = 0;
-    currentBet = 0;
-    playersWhoActed.clear();
     deckForGame = shuffleDeck(createDeck());
-    round = 0; // Reset to preflop
-
-    // Move the dealer button
-    dealerIndex = (dealerIndex + 1) % players.length;
-
-    // Determine small blind and big blind indices
-    let smallBlindIndex = (dealerIndex + 1) % players.length;
-    let bigBlindIndex = (dealerIndex + 2) % players.length;
-    if (players.length === 2) {
-        bigBlindIndex = (dealerIndex + 1) % players.length;
-    }
-
-    // Reset player states and deal cards
-    players.forEach((player, index) => {
+    players.forEach(player => {
         player.hand = dealHand(deckForGame, 2);
         player.currentBet = 0;
-        player.status = "active"; // Reset player status
-        player.isSmallBlind = index === smallBlindIndex;
-        player.isBigBlind = index === bigBlindIndex;
-        player.chips -= player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
-        pot += player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
-        player.currentBet = player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
+        player.status = "active";
+        player.allIn = false;
     });
-
-    // Set the starting player (after the big blind)
-    currentPlayerIndex = (bigBlindIndex + 1) % players.length;
-
-    // Broadcast the updated game state
-    broadcastGameState();
+    tableCards =;
+    pot = 0;
+    currentBet = 0;
+    round = 0;
+    setupBlinds();
 }
 
-// Function to set up blinds for the new hand
 function setupBlinds() {
     pot = 0;
     const smallBlindIndex = (dealerIndex + 1) % players.length;
     const bigBlindIndex = (dealerIndex + 2) % players.length;
-
     postBlind(players[smallBlindIndex], smallBlindAmount);
     postBlind(players[bigBlindIndex], bigBlindAmount);
-
     currentBet = bigBlindAmount;
+    // Start with Under The Gun (UTG), which is the player after the big blind
     currentPlayerIndex = (bigBlindIndex + 1) % players.length;
-    
-    playersWhoActed.clear();
-
-    broadcastGameState();
-    broadcast({ type: "blindsPosted", smallBlind: players[smallBlindIndex].name, bigBlind: players[bigBlindIndex].name });
-setTimeout(() => {
-    if (currentPlayerIndex === (dealerIndex + 2) % players.length) {
-        bigBlindCheckRaiseOption();
-    } else {
-        bettingRound();
-    }
-}, 500);
+    playersWhoActed.clear(); // Reset players who acted
+    sendGameStateToClients();
+    setTimeout(bettingRound, 500);
 }
 
-
-
-
-// Function to post blinds
 function postBlind(player, amount) {
     const blindAmount = Math.min(amount, player.tokens);
     player.tokens -= blindAmount;
@@ -162,561 +105,426 @@ function postBlind(player, amount) {
     if (player.tokens === 0) {
         player.allIn = true;
     }
-    console.log(`${player.name} posts ${blindAmount}.`);
-}
-function bigBlindCheckRaiseOption() {
-    let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
-    if (!bigBlindPlayer || bigBlindPlayer.status !== "active") return;
-
-    if (currentBet === bigBlindAmount && !playersWhoActed.has(bigBlindPlayer.name)) { 
-       console.log(`${bigBlindPlayer.name}, you can check or bet.`);
-        bigBlindPlayer.ws.send(JSON.stringify({
-            type: "bigBlindAction",
-            message: `${bigBlindPlayer.name}, you can check or bet.`,
-            options: ["check", "bet"]
-        }));
-    } else if (!playersWhoActed.has(bigBlindPlayer.name)) {
-        console.log(`${bigBlindPlayer.name}, you must call or fold.`);
-        bigBlindPlayer.ws.send(JSON.stringify({
-            type: "bigBlindAction",
-            message: `${bigBlindPlayer.name}, you must call or fold.`,
-            options: ["call", "fold", "raise"]
-        }));
-    }
+    sendMessageToClients(`${player.name} posts ${blindAmount}.`);
 }
 
-// Function to deal a hand of cards to a player
-function dealHand(deck, numCards) {
-    const hand = [];
-    for (let i = 0; i < numCards; i++) {
-        hand.push(deck.pop());
+function getNextPlayerIndex(currentIndex) {
+    let nextIndex = (currentIndex + 1) % players.length;
+    let attempts = 0;
+    while ((players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) && attempts < players.length) {
+        if (nextIndex === currentIndex) {
+            return -1;
+        }
+        nextIndex = (nextIndex + 1) % players.length;
+        attempts++;
     }
-    return hand;
+    return nextIndex;
 }
 
-// Function to shuffle the deck of cards
-function shuffleDeck(deck) {
-    for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-    return deck;
-}
 function bettingRound() {
-    console.log("Starting betting round...");
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
-    if (activePlayers.length <= 1 || isBettingRoundOver()) {
-        console.log("Betting round over, moving to next round.");
+    if (activePlayers.length <= 1) {
+        console.log("Only one player left, moving to next round.");
+        setTimeout(nextRound, 1000);
+        return;
+    }
+    if (isBettingRoundOver()) {
+        console.log("All players have acted. Betting round is over.");
         setTimeout(nextRound, 1000);
         return;
     }
     const player = players[currentPlayerIndex];
+    // If this player has already acted, move to the next one
     if (playersWhoActed.has(player.name) && player.currentBet === currentBet) {
-        console.log(`${player.name} has already acted. Skipping...`);
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
         bettingRound();
         return;
     }
     console.log(`Waiting for player ${player.name} to act...`);
-    broadcast({ type: "playerTurn", playerName: player.name });
+    sendGameStateToClients(); // Send state before player acts
 }
+
 function isBettingRoundOver() {
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
-    
-    if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
-    
-    // ✅ Move to the next round as soon as all players have either:
-    // 1. Called (matched the currentBet)
-    // 2. Folded
-    const allBetsMatched = activePlayers.every(player => 
-        player.currentBet === currentBet || player.status === "folded"
-    );
-
-    if (allBetsMatched) {
-        playersWhoActed.clear(); // Reset for the next round
+    if (activePlayers.length <= 1) {
+        return true;
+        // If only one player remains, the round ends.
+    }
+    // Ensure all active players have matched the current bet
+    const allCalled = activePlayers.every(player => player.currentBet === currentBet || player.status === "folded");
+    // If all active players have called or folded, the round is over
+    if (allCalled && playersWhoActed.size >= activePlayers.length) {
         return true;
     }
-
     return false;
-}
-
-
-
-function getNextPlayerIndex(currentIndex) {
-    let activePlayers = players.filter(p => p.status === "active" && p.tokens > 0);
-    
-    if (activePlayers.length <= 1) {
-        console.log("Only one player remains, moving to next round.");
-        setTimeout(nextRound, 1000);
-        return -1;
-    }
-
-    let nextIndex = (currentIndex + 1) % players.length;
-    let initialIndex = currentIndex; // Store who originally acted
-    let attempts = 0;
-
-    while (
-        (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
-        && attempts < players.length
-    ) {
-        nextIndex = (nextIndex + 1) % players.length;
-        attempts++;
-
-        // If we looped back to the original raiser, stop
-        if (nextIndex === initialIndex) {
-            console.log("✅ All players have acted. Moving to the next round.");
-            setTimeout(nextRound, 1000);
-            return -1;
-        }
-    }
-
-    if (attempts >= players.length) {
-        console.warn("⚠ No valid player found. Ending round.");
-        setTimeout(nextRound, 1000);
-        return -1;
-    }
-
-    return nextIndex;
 }
 
 function startFlopBetting() {
     currentBet = 0;
-    
-    // ✅ Ensure betting starts with the first active player left of the dealer
-    let startIndex = (dealerIndex + 1) % players.length;
-    while (players[startIndex].status !== "active") {
-        startIndex = (startIndex + 1) % players.length;
-    }
-    currentPlayerIndex = startIndex;
-
+    // Reset betting amount
+    // Betting starts from Small Blind
+    currentPlayerIndex = (dealerIndex + 1) % players.length;
     playersWhoActed.clear();
-    broadcastGameState();
+    sendGameStateToClients();
+    bettingRound();
 }
 
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
-
     currentBet = 0;
-    players.forEach(player => (player.currentBet = 0));
+    players.forEach((player) => (player.currentBet = 0));
     playersWhoActed.clear();
-
+    // Reset players who acted
     if (round === 0) {
-        round = 1;
-        tableCards = dealHand(deckForGame, 3); // Flop
-        broadcast({ type: "message", text: `Flop: ${JSON.stringify(tableCards)}` });
+        round++;
+        tableCards = dealHand(deckForGame, 3);
+        sendMessageToClients(`Flop: ${displayHand(tableCards)}`);
+        // Betting round starts from Small Blind after the flop
+        currentPlayerIndex = (dealerIndex + 1) % players.length;
     } else if (round === 1) {
-        round = 2;
-        tableCards.push(dealHand(deckForGame, 1)[0]); // Turn
-        broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
+        round++;
+        if (deckForGame.length > 0) {
+            tableCards.push(dealCard(deckForGame));
+            sendMessageToClients(`Turn: ${displayCard(tableCards[3])}`);
+        }
     } else if (round === 2) {
-        round = 3;
-        tableCards.push(dealHand(deckForGame, 1)[0]); // River
-        broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
+        round++;
+        if (deckForGame.length > 0) {
+            tableCards.push(dealCard(deckForGame));
+            sendMessageToClients(`River: ${displayCard(tableCards[4])}`);
+        }
     } else if (round === 3) {
         showdown();
         return;
     }
-
-    broadcastGameState();
-    setTimeout(startFlopBetting, 1000);
-}
-
-function endRound() {
-    if (round === 0) { // Preflop
-        // Check if there were any raises
-        const raises = players.filter(player => player.currentBet > bigBlindAmount);
-        if (raises.length === 0) {
-            // No raises, check if BB checked
-            const bigBlind = players.find(player => player.isBigBlind);
-            if (bigBlind && playersWhoActed.has(bigBlind.name)) {
-                // BB checked, end the round
-                console.log("Preflop round ended with BB check.");
-                setTimeout(nextRound, 1000);
-                return;
-            }
-        }
-    }
-
-    // Check if all active players have matched the current bet
-    const activePlayers = players.filter(player => player.status === "active");
-    if (activePlayers.every(player => player.currentBet === currentBet)) {
-        // All active players have called, end the round
-        console.log("Round ended with all active players calling.");
-        setTimeout(nextRound, 1000);
-        return;
-    }
-
-    // If neither condition is met, do nothing (continue the round)
-    console.log("Round not ended.");
-
-    broadcastGameState();
+    sendGameStateToClients();
+    setTimeout(startFlopBetting, 1000); // Ensure betting starts after UI updates
 }
 
 function showdown() {
-    console.log("Showdown!");
+    sendMessageToClients("Showdown!");
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
+    // Only players still in hand
     let winners = determineWinners(activePlayers);
+    // Highlight the winner(s) in UI
     winners.forEach(winner => {
-        console.log(`${winner.name} wins the hand!`);});
-    distributePot();
-    broadcastGameState();
-    broadcast({
-        type: "winner",
-        winners: winners.map(w => w.name),
-        pot: pot
+        sendMessageToClients(`${winner.name} wins the hand!`);
     });
-    setTimeout(resetGame, 3000);
+    distributePot();
+    sendGameStateToClients();
+    setTimeout(resetHand, 3000); // Wait before resetting for new hand
 }
 
 function distributePot() {
-    let activePlayers = players.filter(p => p.status === "active" || p.allIn);
-    activePlayers.sort((a, b) => a.currentBet - b.currentBet);
-
+    let eligiblePlayers = players.filter(p => p.status === "active" || p.allIn);
+    eligiblePlayers.sort((a, b) => a.currentBet - b.currentBet);
     let totalPot = pot;
-    let sidePots = [];
-    while (activePlayers.length > 0) {
-        const minBet = activePlayers[0].currentBet;
+    let sidePots =;
+    // Create side pots for players who went all-in
+    while (eligiblePlayers.length > 0) {
+        const minBet = eligiblePlayers[0].currentBet;
         let potPortion = 0;
-
-        activePlayers.forEach(player => {
+        eligiblePlayers.forEach(player => {
             potPortion += Math.min(minBet, player.currentBet);
             player.currentBet -= Math.min(minBet, player.currentBet);
         });
-
-        sidePots.push({ players: [...activePlayers], amount: potPortion });
-        activePlayers = activePlayers.filter(p => p.currentBet > 0);
+        sidePots.push({ players: [...eligiblePlayers], amount: potPortion });
+        eligiblePlayers = eligiblePlayers.filter(p => p.currentBet > 0);
     }
-
+    // Award each side pot to the correct winners
     sidePots.forEach(sidePot => {
-        let winners = determineWinners(sidePot.players);
-        let splitPot = Math.floor(sidePot.amount / winners.length);
+        const winners = determineWinners(sidePot.players);
+        const splitPot = Math.floor(sidePot.amount / winners.length);
         winners.forEach(winner => {
             winner.tokens += splitPot;
+            sendMessageToClients(`${winner.name} wins ${splitPot} from a side pot.`);
         });
     });
-let remainingPot = totalPot - sidePots.reduce((acc, sp) => acc + sp.amount, 0);
+    // Award any remaining main pot chips
+    let remainingPot = totalPot - sidePots.reduce((acc, sp) => acc + sp.amount, 0);
     if (remainingPot > 0) {
         let mainWinners = determineWinners(players.filter(p => p.status === "active"));
         let splitPot = Math.floor(remainingPot / mainWinners.length);
         mainWinners.forEach(winner => {
             winner.tokens += splitPot;
-            console.log(`${winner.name} wins ${splitPot} from the main pot.`);
+            sendMessageToClients(`${winner.name} wins ${splitPot} from the main pot.`);
         });
     }
+    pot = 0; // Reset pot after distribution
 }
-function resetGame() {
-    console.log("Resetting game for the next round.");
+
+function determineWinners(playerList) {
+    // Exclude folded players
+    let eligiblePlayers = playerList.filter(player => player.status !== "folded");
+    if (eligiblePlayers.length === 1) {
+        return eligiblePlayers;
+        // Only one player left, they win by default
+    }
+    const playerHands = eligiblePlayers.map(player => ({
+        player,
+        hand: evaluateHand(player.hand.concat(tableCards)),
+    }));
+    playerHands.sort((a, b) => b.hand.value - a.hand.value); // Sort by hand strength
+    const bestHandValue = playerHands[0].hand.value;
+    return playerHands
+        .filter(playerHand => playerHand.hand.value === bestHandValue)
+        .map(playerHand => playerHand.player);
+}
+
+function resetHand() {
     round = 0;
-    tableCards = [];
-    pot = 0;
+    tableCards =;
     players.forEach(player => {
-        player.hand = [];
-        player.currentBet = 0;
+        player.hand =;
         player.status = "active";
         player.allIn = false;
     });
-    dealerIndex = (dealerIndex + 1) % players.length; // Move dealer button
+    dealerIndex = (dealerIndex + 1) % players.length;
     startNewHand();
 }
 
-
-function determineWinners(playerList) {
-    if (playerList.length === 0) {
-        return;
-    }
-
-    let bestHandValue = -1;
-    let winners = [];
-
-    playerList.forEach(player => {
-        if (player.status !== "folded") {
-            const handValue = evaluateHand(player.hand.concat(tableCards));
-
-            if (handValue > bestHandValue) {
-                bestHandValue = handValue;
-                winners = [player];
-            } else if (handValue === bestHandValue) {
-                winners.push(player);
-            }
-        }
-    });
-
-    return winners;
-}
-
-// Function to evaluate the hand of a player
+// Hand evaluation functions:
 function evaluateHand(cards) {
-    const hand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
-    const ranks = hand.map(card => card.rank);
-    const suits = hand.map(card => card.suit);
-
-    if (isRoyalFlush(hand, ranks, suits)) return 10;
-    if (isStraightFlush(hand, ranks, suits)) return 9;
-    if (isFourOfAKind(hand, ranks)) return 8;
-    if (isFullHouse(hand, ranks)) return 7;
-    if (isFlush(hand, suits)) return 6;
-    if (isStraight(hand, ranks)) return 5;
-    if (isThreeOfAKind(hand, ranks)) return 4;
-    if (isTwoPair(hand, ranks)) return 3;
-    if (isOnePair(hand, ranks)) return 2;
-    return 1; // High card
+    const allCards = cards.sort((a, b) => rankValues[a.rank] - rankValues[b.rank]);
+    const ranks = allCards.map(c => rankValues[c.rank]);
+    const suits = allCards.map(c => c.suit);
+    if (isRoyalFlush(allCards, ranks, suits)) return { value: 10, handName: "Royal Flush" };
+    if (isStraightFlush(allCards, ranks, suits)) return { value: 9, handName: "Straight Flush", highCard: getStraightHighCard(ranks) };
+    if (isFourOfAKind(ranks)) return { value: 8, handName: "Four of a Kind", quadRank: getQuadRank(ranks), kicker: getKicker(ranks, getQuadRank(ranks)) };
+    if (isFullHouse(ranks)) return { value: 7, handName: "Full House", tripsRank: getTripsRank(ranks), pairRank: getPairRank(ranks) };
+    if (isFlush(suits)) return { value: 6, handName: "Flush", highCard: getFlushHighCard(ranks, suits) };
+    if (isStraight(ranks)) return { value: 5, handName: "Straight", highCard: getStraightHighCard(ranks) };
+    if (isThreeOfAKind(ranks)) return { value: 4, handName: "Three of a Kind", tripsRank: getTripsRank(ranks), kickers: getKickers(ranks, getTripsRank(ranks)) };
+    if (isTwoPair(ranks)) return { value: 3, handName: "Two Pair", highPairs: getTwoPairHighCards(ranks), kicker: getKicker(ranks, getTwoPairHighCards(ranks)[0], getTwoPairHighCards(ranks)[1]) };
+    if (isOnePair(ranks)) return { value: 2, handName: "One Pair", pairRank: getPairRank(ranks), kickers: getKickers(ranks, getPairRank(ranks)) };
+    return { value: 1, handName: "High Card", highCard: ranks[6] };
 }
-
-// Helper functions to check for different hand types
-function isRoyalFlush(hand, ranks, suits) {
-    if (!isFlush(hand, suits)) return false;
-    const royalRanks = ["10", "J", "Q", "K", "A"];
+// Helper functions for hand evaluation:
+function isRoyalFlush(cards, ranks, suits) {
+    if (!isFlush(suits)) return false;
+    const royalRanks = [10, 11, 12, 13, 14];
     return royalRanks.every(rank => ranks.includes(rank));
 }
-
-function isStraightFlush(hand, ranks, suits) {
-    return isFlush(hand, suits) && isStraight(hand, ranks);
+function isStraightFlush(cards, ranks, suits) {
+    return isFlush(suits) && isStraight(ranks);
 }
-
-function isFourOfAKind(hand, ranks) {
-    for (let rank of ranks) {
-        if (ranks.filter(r => r === rank).length === 4) {
-            return true;
-        }
-    }
-    return false;
+function isFourOfAKind(ranks) {
+    return ranks.some(rank => ranks.filter(r => r === rank).length === 4);
 }
-
-function isFullHouse(hand, ranks) {
-    let three = false;
-    let pair = false;
-    for (let rank of ranks) {
-        if (ranks.filter(r => r === rank).length === 3) {
-            three = true;
-        }
-        if (ranks.filter(r => r === rank).length === 2) {
-            pair = true;
-        }
-    }
-    return three && pair;
+function isFullHouse(ranks) {
+    return isThreeOfAKind(ranks) && isOnePair(ranks);
 }
-
-function isFlush(hand, suits) {
+function isFlush(suits) {
     return suits.every(suit => suit === suits[0]);
 }
-
-function isStraight(hand, ranks) {
-    const rankValues = hand.map(card => {
-        if (card.rank === "A") return 14;
-        if (card.rank === "K") return 13;
-        if (card.rank === "Q") return 12;
-        if (card.rank === "J") return 11;
-        return parseInt(card.rank);
-    }).sort((a, b) => a - b);
-
-    if (rankValues[4] - rankValues[0] === 4) return true;
-    if (rankValues[3] - rankValues[0] === 3 && rankValues[4] === 14 && rankValues[3] === 5) return true; // Special case for A,2,3,4,5
-    return false;
-}
-
-function isThreeOfAKind(hand, ranks) {
-    for (let rank of ranks) {
-        if (ranks.filter(r => r === rank).length === 3) {
+function isStraight(ranks) {
+    for (let i = 0; i < ranks.length - 4; i++) {
+        if (ranks[i + 1] === ranks[i] + 1 && ranks[i + 2] === ranks[i] + 2 && ranks[i + 3] === ranks[i] + 3 && ranks[i + 4] === ranks[i] + 4) {
             return true;
         }
     }
-    return false;
-}
-
-function isTwoPair(hand, ranks) {
-    let pairs = 0;
-    let checkedRanks = new Set();
-    for (let rank of ranks) {
-        if (checkedRanks.has(rank)) continue;
-        if (ranks.filter(r => r === rank).length === 2) {
-            pairs++;
-            checkedRanks.add(rank);
-        }
-    }
-    return pairs === 2;
-}
-
-function isOnePair(hand, ranks) {
-    for (let rank of ranks) {
-        if (ranks.filter(r => r === rank).length === 2) {
-            return true;
-        }
+    if (ranks[3] === 5 && ranks[4] === 10 && ranks[5] === 11 && ranks[6] === 12 && ranks[7] === 13) {
+        return true;
     }
     return false;
 }
+function isThreeOfAKind(ranks) {
+    return ranks.some(rank => ranks.filter(r => r === rank).length === 3);
+}
+function isTwoPair(ranks) {
+    const pairs = ranks.filter((rank, index) => ranks.indexOf(rank) !== index).sort((a, b) => b - a);
+    return new Set(pairs).size === 2;
+}
+function isOnePair(ranks) {
+    return ranks.some((rank, index) => ranks.indexOf(rank) !== index);
+}
+function getQuadRank(ranks) {
+    return ranks.find(rank => ranks.filter(r => r === rank).length === 4);
+}
+function getTripsRank(ranks) {
+    return ranks.find(rank => ranks.filter(r => r === rank).length === 3);
+}
+function getPairRank(ranks) {
+    return ranks.find((rank, index) => ranks.indexOf(rank) !== index);
+}
+function getKicker(ranks, ...excludeRanks) {
+    return ranks.filter(rank => !excludeRanks.includes(rank)).sort((a, b) => b - a)[0];
+}
+function getKickers(ranks, excludeRank) {
+    return ranks.filter(rank => rank !== excludeRank).sort((a, b) => b - a).slice(0, 2);
+}
+function getStraightHighCard(ranks) {
+    for (let i = ranks.length - 5; i >= 0; i--) {
+        if (ranks[i + 1] === ranks[i] + 1 && ranks[i + 2] === ranks[i] + 2 && ranks[i + 3] === ranks[i] + 3 && ranks[i + 4] === ranks[i] + 4) {
+            return ranks[i + 4];
+        }
+    }
+    if (ranks[3] === 5 && ranks[4] === 10 && ranks[5] === 11 && ranks[6] === 12 && ranks[7] === 13) {
+        return 13;
+    }
+    return 0;
+}
+function getFlushHighCard(ranks, suits) {
+    const flushSuit = suits.find((suit, index, arr) => arr.filter(s => s === suit).length >= 5);
+    const flushRanks = ranks.filter((_, index) => suits[index] === flushSuit).sort((a, b) => b - a);
+    return flushRanks[0];
+}
+function getTwoPairHighCards(ranks) {
+    const pairs = ranks.filter((rank, index) => ranks.indexOf(rank) !== index).sort((a, b) => b - a);
+    return [pairs[0], pairs[2]];
+}
 
-// WebSocket server event handling
-wss.on('connection', function connection(ws) {
-    console.log('✅ A new client connected');
+// WebSocket event handlers
+io.on('connection', (socket) => {
+    console.log('A user connected');
 
-    ws.on('message', function incoming(message) {
-        console.log('📩 Received message from client:', message);
-
-        try {
-            const data = JSON.parse(message);
-
-            if (data.type === 'join') {
-                const player = {
-                    name: data.name,
-                    ws: ws,
-                    tokens: 1000,
-                    hand:[],
-                    currentBet: 0,
-                    status: 'active',
-                    allIn: false
-                };
-                players.push(player);
-                console.log(`➕ Player ${data.name} joined. Total players: ${players.length}`);
-                broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
-            } else if (data.type === 'startGame') {
-                startGame();
-            } else if (data.type === 'bet') {
-                handleBet(data);
-            } else if (data.type === 'raise') {
-                handleRaise(data);
-            } else if (data.type === 'call') {
-                handleCall(data);
-            } else if (data.type === 'fold') {
-                handleFold(data);
-            } else if (data.type === 'check') {
-                handleCheck(data);
-            }
-
-        } catch (error) {
-            console.error('❌ Error parsing message:', error);
+    socket.on('addPlayer', (playerName) => {
+        if (players.length < 10) {
+            // Limit the number of players
+             players.push(createPlayer(playerName, 1000));
+             sendGameStateToClients();
+        } else {
+            socket.emit('message', "Too many players. Game limit is 10.");
         }
     });
 
-    ws.on('close', () => {
-        console.log('❌ Client disconnected');
-        players = players.filter(player => player.ws !== ws);
-        broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
+    socket.on('startGame', () => {
+        if (players.length >= 2) {
+            startGame(players.map(p => p.name), 1000);
+            sendGameStateToClients();
+        } else {
+            socket.emit('message', "You need at least two players to start.");
+        }
+    });
+
+    socket.on('restartGame', () => {
+        players =;
+        tableCards =;
+        pot = 0;
+        currentPlayerIndex = 0;
+        deckForGame =;
+        currentBet = 0;
+        round = 0;
+        dealerIndex = 0;
+        playersWhoActed.clear();
+        sendGameStateToClients();
+    });
+
+    socket.on('playerAction', (action, amount) => {
+        const player = players[currentPlayerIndex];
+        if (!player) return; //  Handle cases where player might be undefined
+
+        playersWhoActed.add(player.name); // Mark player as having acted
+
+        switch (action) {
+            case 'fold':
+                fold(player);
+                break;
+            case 'call':
+                call(player);
+                break;
+            case 'bet':
+                if (amount !== undefined) {
+                    bet(player, amount);
+                } else {
+                    console.error("Bet amount is undefined");
+                    return;
+                }
+                break;
+            case 'raise':
+                if (amount !== undefined) {
+                     raise(player, amount);
+                } else {
+                    console.error("Raise amount is undefined");
+                    return;
+                }
+                break;
+            case 'check':
+                check(player);
+                break;
+        }
+        sendGameStateToClients();
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+        bettingRound();
+    });
+
+    socket.on('disconnect', () => {
+        console.log('A user disconnected');
     });
 });
 
-// Action handlers
-function handleBet(data) {
-    const player = players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
-        return;
-    }
-
-    const betAmount = parseInt(data.amount);
-
-    if (betAmount > player.tokens) {
-        console.error("Not enough tokens:", data.playerName);
-        return;
-    }
-
-    player.tokens -= betAmount;
-    player.currentBet = betAmount;
-    pot += betAmount;
-    currentBet = betAmount; // Update the current bet
-
-    // Move to the next player
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-    // Broadcast the updated game state
-    broadcastGameState();
+function sendGameStateToClients() {
+    io.emit('gameState', {
+        players: players,
+        tableCards: tableCards,
+        pot: pot,
+        currentPlayerIndex: currentPlayerIndex,
+        dealerIndex: dealerIndex,
+        currentBet: currentBet,
+        round: round
+    });
 }
 
-function handleRaise(data) {
-    const player = players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
-        return;
-    }
-
-    const raiseAmount = parseInt(data.amount);
-
-    if (raiseAmount <= currentBet || raiseAmount > player.tokens) {
-        console.error("Invalid raise amount:", data.playerName);
-        return;
-    }
-
-    const totalBet = raiseAmount;
-    player.tokens -= totalBet - player.currentBet;
-    pot += totalBet - player.currentBet;
-    player.currentBet = totalBet;
-    currentBet = totalBet;
-
-    // ✅ Mark this player as having acted
-    playersWhoActed.add(player.name); 
-
-    // Move to the next player
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-    // Broadcast the updated game state
-    broadcastGameState();
+function sendMessageToClients(message) {
+    io.emit('message', message);
 }
 
+function fold(player) {
+    player.status = "folded";
+    sendMessageToClients(`${player.name} folds.`);
+}
 
-function handleCall(data) {
-    const player = players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
-        return;
-    }
-
+function call(player) {
     let amount = Math.min(currentBet - player.currentBet, player.tokens);
     player.tokens -= amount;
     player.currentBet += amount;
     pot += amount;
+    sendMessageToClients(`${player.name} calls.`);
     if (player.tokens === 0) {
         player.allIn = true;
     }
-
-    // Move to the next player
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-    // Broadcast the updated game state
-    broadcastGameState();
 }
 
-function handleFold(data) {
-    const player = players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
+function bet(player, amount) {
+    if (amount > player.tokens || amount < currentBet) {
+        sendMessageToClients("Invalid bet");
         return;
     }
-
-    player.status = "folded";
-
-    // Move to the next player
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-    // Broadcast the updated game state
-    broadcastGameState();
+    player.tokens -= amount;
+    pot += amount;
+    player.currentBet = amount;
+    currentBet = amount;
+    sendMessageToClients(`${player.name} bets ${amount}.`);
+    if (player.tokens === 0) {
+        player.allIn = true;
+    }
 }
 
-function handleCheck(data) {
-    const player = players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
+function raise(player, amount) {
+    if (amount <= currentBet || amount > player.tokens) {
+        sendMessageToClients("Invalid raise");
         return;
     }
+    const totalBet = amount;
+    player.tokens -= totalBet - player.currentBet;
+    pot += totalBet - player.currentBet;
+    player.currentBet = totalBet;
+    currentBet = totalBet;
+    sendMessageToClients(`${player.name} raises to ${totalBet}.`);
+    if (player.tokens === 0) {
+        player.allIn = true;
+    }
+}
 
+function check(player) {
     if (currentBet === 0 || player.currentBet === currentBet) {
-        console.log(`${player.name} checked.`);
-        playersWhoActed.add(player.name); // ✅ Mark player as having acted
-
-        // ✅ Move to the next player
-        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-        if (isBettingRoundOver()) {
-            console.log("All players have checked/called. Moving to next round.");
-            setTimeout(nextRound, 1000);
-        } else {
-            console.log(`Next player: ${players[currentPlayerIndex].name}`);
-            broadcastGameState();
-        }
+        sendMessageToClients(`${player.name} checks.`);
     } else {
-        console.log("Check not allowed, there is a bet to match.");
+        sendMessageToClients("You cannot check when there is a bet.");
     }
 }
 
-// Start the server
-server.listen(process.env.PORT || 8080, () => {
-    console.log(`WebSocket server started on port ${server.address().port}`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
