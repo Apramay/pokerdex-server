@@ -16,7 +16,7 @@ const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 const rankValues = { "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K": 13, "A": 14 };
 
 function createDeck() {
-    const deck =;
+    const deck = [];
     for (const suit of suits) {
         for (const rank of ranks) {
             deck.push({ suit, rank });
@@ -38,7 +38,7 @@ function dealCard(deck) {
 }
 
 function dealHand(deck, numCards) {
-    const hand =;
+    const hand = [];
     for (let i = 0; i < numCards; i++) {
         hand.push(dealCard(deck));
     }
@@ -49,11 +49,11 @@ function createPlayer(name, tokens) {
     return { name: name, tokens: tokens, hand:, currentBet: 0, status: "active", allIn: false };
 }
 
-let players =;
-let tableCards =;
+let players = [];
+let tableCards = [];
 let pot = 0;
 let currentPlayerIndex = 0;
-let deckForGame =;
+let deckForGame = [];
 let currentBet = 0;
 let round = 0;
 let smallBlindAmount = 10;
@@ -76,7 +76,7 @@ function startNewHand() {
         player.status = "active";
         player.allIn = false;
     });
-    tableCards =;
+    tableCards = [];
     pot = 0;
     currentBet = 0;
     round = 0;
