@@ -416,7 +416,7 @@ function sendGameStateToAll(message) {
     const gameState = {
         type: 'gameState',
         gameState: {
-            players: players.map(p => ({ ...p, hand: p.status === "active" ? p.hand :})), //  Hide folded hands
+            players: players.map(p => ({ ...p, hand: p.status === "active" ? p.hand : [] })), // Hide folded hands
             tableCards: tableCards,
             pot: pot,
             currentPlayerIndex: currentPlayerIndex,
@@ -464,11 +464,11 @@ wss.on('connection', ws => {
                     sendGameStateToAll("You need at least two players to start.");
                 }
             } else if (data.type === 'restartGame') {
-                players =;
-                tableCards =;
+                players = [];
+                tableCards = [];
                 pot = 0;
                 currentPlayerIndex = 0;
-                deckForGame =;
+                deckForGame = [];
                 currentBet = 0;
                 round = 0;
                 sendGameStateToAll();
