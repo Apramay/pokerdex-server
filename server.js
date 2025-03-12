@@ -13,7 +13,7 @@ const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 const rankValues = { "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K": 13, "A": 14 }; //  Card constants [cite: 2]
 
 function createDeck() {
-    const deck =;
+    const deck = [];
     for (const suit of suits) {
         for (const rank of ranks) {
             deck.push({ suit, rank }); //  Push card object to deck
@@ -35,7 +35,7 @@ function dealCard(deck) {
 }
 
 function dealHand(deck, numCards) {
-    const hand =;
+    const hand = [];
     for (let i = 0; i < numCards; i++) {
         hand.push(dealCard(deck)); //  Deal cards to hand
     }
@@ -46,11 +46,11 @@ function createPlayer(name, tokens) {
     return { name: name, tokens: tokens, hand:, currentBet: 0, status: "active", allIn: false }; //  Player object [cite: 14]
 }
 
-let players =;
-let tableCards =;
+let players = [];
+let tableCards = [];
 let pot = 0;
 let currentPlayerIndex = 0;
-let deckForGame =;
+let deckForGame = [];
 let currentBet = 0;
 let round = 0;
 let smallBlindAmount = 10;
@@ -241,7 +241,7 @@ function distributePot() {
     let eligiblePlayers = players.filter(p => p.status === "active" || p.allIn); //  Get eligible players [cite: 87, 88, 89, 90, 91, 92, 93, 94, 95, 96]
     eligiblePlayers.sort((a, b) => a.currentBet - b.currentBet);
     let totalPot = pot;
-    let sidePots =;
+    let sidePots = [];
     // Create side pots for players who went all-in
     while (eligiblePlayers.length > 0) {
         const minBet = eligiblePlayers[0].currentBet;
@@ -294,7 +294,7 @@ function determineWinners(playerList) {
 
 function resetHand() {
     round = 0; //  Reset round [cite: 101, 102, 103]
-    tableCards =; //  Clear table cards [cite: 101, 102, 103]
+    tableCards = []; //  Clear table cards [cite: 101, 102, 103]
     players.forEach(player => {
         player.hand =; //  Clear player hands [cite: 102, 103]
         player.status ="active";
