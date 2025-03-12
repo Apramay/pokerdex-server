@@ -219,7 +219,7 @@ function distributePot() {
     let eligiblePlayers = players.filter(p => p.status === "active" || p.allIn);
     eligiblePlayers.sort((a, b) => a.currentBet - b.currentBet);
     let totalPot = pot;
-    let sidePots =;
+    let sidePots = [];
     // Create side pots for players who went all-in
     while (eligiblePlayers.length > 0) {
         const minBet = eligiblePlayers[0].currentBet;
@@ -273,7 +273,7 @@ function determineWinners(playerList) {
 
 function resetHand() {
     round = 0;
-    tableCards =;
+    tableCards = [];
     players.forEach(player => {
         player.hand =;
         player.status = "active";
@@ -398,8 +398,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('restartGame', () => {
-        players =;
-        tableCards =;
+        players = [];
+        tableCards = [];
         pot = 0;
         currentPlayerIndex = 0;
         deckForGame =;
