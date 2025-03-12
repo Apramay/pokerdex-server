@@ -666,7 +666,6 @@ function handleCheck(data) {
         console.log("Check not allowed, there is a bet to match.");
     }
 }
-
 // Start the server
 server.listen(process.env.PORT || 8080, () => {
     console.log(`WebSocket server started on port ${server.address().port}`);
