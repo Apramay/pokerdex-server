@@ -289,11 +289,13 @@ function nextRound() {
         if (deckForGame.length > 0) {
             tableCards.push(dealCard(deckForGame));
         broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
+        }
     } else if (round === 2) {
         round++;
         if (deckForGame.length > 0) {
             tableCards.push(dealCard(deckForGame));
         broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
+        }
     } else if (round === 3) {
         showdown();
         return;
