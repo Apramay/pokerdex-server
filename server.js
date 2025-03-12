@@ -43,7 +43,7 @@ function dealHand(deck, numCards) {
 }
 
 function createPlayer(name, tokens) {
-    return { name: name, tokens: tokens, hand:, currentBet: 0, status: "active", allIn: false }; //  Player object [cite: 14]
+    return { name: name, tokens: tokens, hand: [] , currentBet: 0, status: "active", allIn: false }; //  Player object [cite: 14]
 }
 
 let players = [];
@@ -72,7 +72,7 @@ function startNewHand() {
         player.status = "active";
         player.allIn = false;
     });
-    tableCards =; //  Clear table cards [cite: 18]
+    tableCards = []; //  Clear table cards [cite: 18]
     pot = 0; //  Reset pot [cite: 18]
     currentBet = 0; //  Reset current bet [cite: 18]
     round = 0; //  Reset round [cite: 18]
