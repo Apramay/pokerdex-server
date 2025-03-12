@@ -296,7 +296,7 @@ function resetHand() {
     round = 0; //  Reset round [cite: 101, 102, 103]
     tableCards = []; //  Clear table cards [cite: 101, 102, 103]
     players.forEach(player => {
-        player.hand =; //  Clear player hands [cite: 102, 103]
+        player.hand = []; //  Clear player hands [cite: 102, 103]
         player.status ="active";
         player.allIn = false;
     });
