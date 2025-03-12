@@ -164,23 +164,22 @@ function getNextPlayerIndex(currentIndex) {
     let nextIndex = (currentIndex + 1) % players.length;
     let attempts = 0;
 
-    while (
-        (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
-        && attempts < players.length
-    ) {
-        console.log(`⏩ Skipping ${players[nextIndex].name} (Status: ${players[nextIndex].status}, Tokens: ${players[nextIndex].tokens})`);
-        
-        if (nextIndex === currentIndex) {
-            console.log("✅ All players have acted. Moving to the next round.");
-            setTimeout(nextRound, 1000);
-            return -1;
+    while (attempts < players.length) {
+        let nextPlayer = players[nextIndex];
+
+        if (nextPlayer.status === "active" && nextPlayer.tokens > 0 && !nextPlayer.allIn) {
+            console.log(`🎯 Next player is ${nextPlayer.name}`);
+            return nextIndex;
         }
+
+        console.log(`⏩ Skipping ${nextPlayer.name} (Status: ${nextPlayer.status}, Tokens: ${nextPlayer.tokens})`);
         nextIndex = (nextIndex + 1) % players.length;
         attempts++;
     }
 
-    console.log(`🎯 Next player is ${players[nextIndex].name}`);
-    return nextIndex;
+    console.log("✅ All players have acted. Moving to the next round.");
+    setTimeout(nextRound, 1000);
+    return -1;
 }
 
 
