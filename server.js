@@ -146,9 +146,6 @@ function setupBlinds() {
 }
 
 
-
-
-// Function to post blinds
 function postBlind(player, amount) {
     const blindAmount = Math.min(amount, player.tokens);
     player.tokens -= blindAmount;
@@ -213,9 +210,6 @@ function isBettingRoundOver() {
     
     if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
     
-    // ✅ Move to the next round as soon as all players have either:
-    // 1. Called (matched the currentBet)
-    // 2. Folded
     const allCalled = activePlayers.every(player => 
         player.currentBet === currentBet || player.status === "folded"
     );
@@ -231,12 +225,11 @@ function isBettingRoundOver() {
 function bigBlindCheckRaiseOption() {
     let bigBlindPlayer = players[(dealerIndex + 2) % players.length];
 
-    if (currentBet === bigBlindAmount && !playersWhoActed.has(bigBlindPlayer.name)) { 
+    if (currentBet === bigBlindAmount) { 
        console.log(`${bigBlindPlayer.name}, you can check or bet.`);
         bigBlindPlayer.ws.send(JSON.stringify({
             type: "bigBlindAction",
-            message: `${bigBlindPlayer.name}, you can check or bet.`,
-            options: ["check", "bet"]
+            options: ["check", "raise"]
         }));
     } else  {
         console.log(`${bigBlindPlayer.name}, you must call or fold.`);
@@ -276,7 +269,8 @@ function startFlopBetting() {
         currentPlayerIndex = (dealerIndex + 1) % players.length;
 
     playersWhoActed.clear();
-    broadcastGameState();
+        bettingRound();
+
 }
 
 function nextRound() {
@@ -292,11 +286,13 @@ function nextRound() {
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(tableCards)}` });
     } else if (round === 1) {
         round ++;
-        tableCards.push(dealHand(deckForGame, 1)[0]); // Turn
+        if (deckForGame.length > 0) {
+            tableCards.push(dealCard(deckForGame));
         broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
     } else if (round === 2) {
         round++;
-        tableCards.push(dealHand(deckForGame, 1)[0]); // River
+        if (deckForGame.length > 0) {
+            tableCards.push(dealCard(deckForGame));
         broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
     } else if (round === 3) {
         showdown();
