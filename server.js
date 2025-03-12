@@ -158,8 +158,8 @@ function postBlind(player, amount) {
 }
 
 
-
 function getNextPlayerIndex(currentIndex) {
+    console.log(`🔄 Finding next player from index ${currentIndex}`);
 
     let nextIndex = (currentIndex + 1) % players.length;
     let attempts = 0;
@@ -168,18 +168,21 @@ function getNextPlayerIndex(currentIndex) {
         (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
         && attempts < players.length
     ) {
-  if (nextIndex === currentIndex) {
+        console.log(`⏩ Skipping ${players[nextIndex].name} (Status: ${players[nextIndex].status}, Tokens: ${players[nextIndex].tokens})`);
+        
+        if (nextIndex === currentIndex) {
             console.log("✅ All players have acted. Moving to the next round.");
             setTimeout(nextRound, 1000);
             return -1;
         }
         nextIndex = (nextIndex + 1) % players.length;
         attempts++;
-        
     }
 
+    console.log(`🎯 Next player is ${players[nextIndex].name}`);
     return nextIndex;
 }
+
 
 function bettingRound() {
     console.log("Starting betting round...");
@@ -213,8 +216,9 @@ function isBettingRoundOver() {
 
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
     
-    if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
-    
+    if (activePlayers.length <= 1) return true; // ✅ Only one player left, round ends immediately
+
+    // ✅ Ensure all active players have either checked or matched the current bet
     const allCalledOrChecked = activePlayers.every(player => 
         playersWhoActed.has(player.name) &&
         (player.currentBet === currentBet || currentBet === 0)
@@ -223,6 +227,7 @@ function isBettingRoundOver() {
     console.log("✅ Betting round over:", allCalledOrChecked);
     return allCalledOrChecked;
 }
+
 
 
 function bigBlindCheckRaiseOption() {
@@ -378,7 +383,7 @@ function resetGame() {
 
 function determineWinners(playerList) {
     if (playerList.length === 0) {
-        return;
+        return [];
     }
 
     let bestHandValue = -1;
