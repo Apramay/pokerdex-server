@@ -206,19 +206,22 @@ function bettingRound() {
 }
 
 function isBettingRoundOver() {
+    console.log("📊 Checking if betting round is over...");
+    console.log("playersWhoActed:", [...playersWhoActed]);
+    console.log("Current Bet:", currentBet);
+    console.log("Active Players:", players.filter(p => p.status === "active").map(p => p.name));
+
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
     
     if (activePlayers.length <= 1) return true; // Only one player left, round ends immediately
     
-    const allCalled = activePlayers.every(player => 
-        player.currentBet === currentBet || player.status === "folded"
+    const allCalledOrChecked = activePlayers.every(player => 
+        playersWhoActed.has(player.name) &&
+        (player.currentBet === currentBet || currentBet === 0)
     );
 
-   if (allCalled && playersWhoActed.size >= activePlayers.length) {
-        return true;
-    }
-
-    return false;
+    console.log("✅ Betting round over:", allCalledOrChecked);
+    return allCalledOrChecked;
 }
 
 
@@ -664,6 +667,7 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
             setTimeout(nextRound, 1000);
         } else {
             console.log(`Next player: ${players[currentPlayerIndex].name}`);
+            currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
             broadcastGameState();
         }
     } else {
