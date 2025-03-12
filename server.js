@@ -171,7 +171,7 @@ function getNextPlayerIndex(currentIndex) {
         (players[nextIndex].status !== "active" || players[nextIndex].tokens === 0 || players[nextIndex].allIn) 
         && attempts < players.length
     ) {
-  if (nextIndex === initialIndex) {
+  if (nextIndex === currentIndex) {
             console.log("✅ All players have acted. Moving to the next round.");
             setTimeout(nextRound, 1000);
             return -1;
