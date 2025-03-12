@@ -46,7 +46,7 @@ function dealHand(deck, numCards) {
 }
 
 function createPlayer(name, tokens) {
-    return { name: name, tokens: tokens, hand:, currentBet: 0, status: "active", allIn: false };
+    return { name: name, tokens: tokens, hand: [], currentBet: 0, status: "active", allIn: false };
 }
 
 let players = [];
