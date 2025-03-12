@@ -613,8 +613,13 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
-    // Broadcast the updated game state
-    broadcastGameState();
+  if (isBettingRoundOver()) {
+        console.log("All players have called or checked. Moving to next round.");
+        setTimeout(nextRound, 1000);
+    } else {
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+        broadcastGameState();
+    }
 }
 
 function handleFold(data) {
@@ -636,10 +641,14 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-    // Broadcast the updated game state
-    broadcastGameState();
-}
+ if (isBettingRoundOver()) {
+        console.log("All players have called or checked. Moving to next round.");
+        setTimeout(nextRound, 1000);
+    } else {
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+        broadcastGameState();
+    }
+    }
 
 
 
