@@ -549,6 +549,9 @@ wss.on('connection', function connection(ws) {
 
 // Action handlers
 function handleRaise(data) {
+    console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+console.log("Before updating playersWhoActed:", [...playersWhoActed]);
+
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
         console.error("Player not found:", data.playerName);
@@ -570,6 +573,8 @@ function handleRaise(data) {
 
     // ✅ Mark this player as having acted
     playersWhoActed.add(player.name);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
+
 
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
@@ -580,6 +585,9 @@ function handleRaise(data) {
 
 
 function handleCall(data) {
+    console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+console.log("Before updating playersWhoActed:", [...playersWhoActed]);
+
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
         console.error("Player not found:", data.playerName);
@@ -596,6 +604,8 @@ function handleCall(data) {
 
     // ✅ Mark player as having acted
     playersWhoActed.add(player.name);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
+
 
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
@@ -605,6 +615,9 @@ function handleCall(data) {
 }
 
 function handleFold(data) {
+    console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+console.log("Before updating playersWhoActed:", [...playersWhoActed]);
+
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
         console.error("Player not found:", data.playerName);
@@ -615,6 +628,8 @@ function handleFold(data) {
 
     // ✅ Mark this player as having acted
     playersWhoActed.add(player.name);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
+
 
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
@@ -626,6 +641,9 @@ function handleFold(data) {
 
 
 function handleCheck(data) {
+    console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+console.log("Before updating playersWhoActed:", [...playersWhoActed]);
+
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
         console.error("Player not found:", data.playerName);
@@ -635,6 +653,8 @@ function handleCheck(data) {
     if (currentBet === 0 || player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
         playersWhoActed.add(player.name); // ✅ Mark player as having acted
+        console.log("After updating playersWhoActed:", [...playersWhoActed]);
+
 
         // ✅ Move to the next player
         currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
