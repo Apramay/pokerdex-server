@@ -184,7 +184,6 @@ function getNextPlayerIndex(currentIndex) {
     return nextIndex;
 }
 
-let playersWhoActed = new Set(); // Track players who acted
 function bettingRound() {
     console.log("Starting betting round...");
     let activePlayers = players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
