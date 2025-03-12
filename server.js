@@ -287,13 +287,13 @@ function nextRound() {
     } else if (round === 1) {
         round ++;
         if (deckForGame.length > 0) {
-            tableCards.push(dealHard(deckForGame));
+            tableCards.push(dealHand(deckForGame));
         broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
         }
     } else if (round === 2) {
         round++;
         if (deckForGame.length > 0) {
-            tableCards.push(dealHard(deckForGame));
+            tableCards.push(dealHand(deckForGame));
         broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
         }
     } else if (round === 3) {
@@ -548,32 +548,6 @@ wss.on('connection', function connection(ws) {
 });
 
 // Action handlers
-function handleBet(data) {
-    const player = players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
-        return;
-    }
-
-    const betAmount = parseInt(data.amount);
-
-    if (betAmount > player.tokens) {
-        console.error("Not enough tokens:", data.playerName);
-        return;
-    }
-
-    player.tokens -= betAmount;
-    player.currentBet = betAmount;
-    pot += betAmount;
-    currentBet = betAmount; // Update the current bet
-
-    // Move to the next player
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-    // Broadcast the updated game state
-    broadcastGameState();
-}
-
 function handleRaise(data) {
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
@@ -595,7 +569,7 @@ function handleRaise(data) {
     currentBet = totalBet;
 
     // ✅ Mark this player as having acted
-    playersWhoActed.add(player.name); 
+    playersWhoActed.add(player.name);
 
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
@@ -620,6 +594,9 @@ function handleCall(data) {
         player.allIn = true;
     }
 
+    // ✅ Mark player as having acted
+    playersWhoActed.add(player.name);
+
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
@@ -636,12 +613,17 @@ function handleFold(data) {
 
     player.status = "folded";
 
+    // ✅ Mark this player as having acted
+    playersWhoActed.add(player.name);
+
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
     // Broadcast the updated game state
     broadcastGameState();
 }
+
+
 
 function handleCheck(data) {
     const player = players.find(p => p.name === data.playerName);
