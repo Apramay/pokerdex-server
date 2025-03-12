@@ -725,7 +725,7 @@ restartBtn.onclick = function(){
 };
 wss.on("connection", (ws) => {
     console.log("✅ New player connected");
-    ws.send(JSON.stringify({ type: "updatePlayers", players.map(({ ws, ...player }) => player) }));
+    ws.send(JSON.stringify({ type: "updatePlayers", players.map(({ ws, ...player }) => player [] )  }));
 
     ws.on("message", (message) => {
         try {
