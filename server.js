@@ -291,6 +291,8 @@ function nextRound() {
     currentBet = 0;
     players.forEach(player => (player.currentBet = 0));
     playersWhoActed.clear();
+        console.log("🆕 New round started. Reset playersWhoActed."); // ✅ Debugging log
+
 
     if (round === 0) {
         round ++;
