@@ -553,7 +553,18 @@ wss.on('connection', function connection(ws) {
         broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
     });
 });
-
+if (data.type === "getGameState") {
+    ws.send(JSON.stringify({
+        type: "updateGameState",
+        players,
+        tableCards,
+        pot,
+        currentBet,
+        round,
+        currentPlayerIndex,
+        dealerIndex
+    }));
+}
 // Action handlers
 function handleRaise(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
@@ -590,10 +601,9 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
     broadcastGameState();
 }
 
-
 function handleCall(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
-console.log("Before updating playersWhoActed:", [...playersWhoActed]);
+    console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
@@ -609,22 +619,28 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
         player.allIn = true;
     }
 
-    // ✅ Mark player as having acted
+    // ✅ Add player to "acted" set
     playersWhoActed.add(player.name);
     console.log("After updating playersWhoActed:", [...playersWhoActed]);
 
-
-    // Move to the next player
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
-  if (isBettingRoundOver()) {
-        console.log("All players have called or checked. Moving to next round.");
+    // ✅ Check if ALL players have acted before moving forward
+    if (isBettingRoundOver()) {
+        console.log("✅ All players have called/checked. Moving to next round.");
         setTimeout(nextRound, 1000);
     } else {
-        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-        broadcastGameState();
+        // ✅ Instead of skipping players, ensure next active player gets a turn
+        const nextIndex = getNextPlayerIndex(currentPlayerIndex);
+        if (nextIndex !== -1) {
+            currentPlayerIndex = nextIndex;
+            console.log(`🎯 Next player is ${players[currentPlayerIndex].name}`);
+            broadcastGameState();
+        } else {
+            console.log("⚠️ No valid next player found. Ending round.");
+            setTimeout(nextRound, 1000);
+        }
     }
 }
+
 
 function handleFold(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
