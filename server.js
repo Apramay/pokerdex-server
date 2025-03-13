@@ -271,7 +271,7 @@ function startFlopBetting() {
     currentBet = 0;
     playersWhoActed.clear();
 
-    let firstActivePlayerIndex = getNextPlayerIndex((dealerIndex + 1) % players.length);
+    let firstActivePlayerIndex = getNextPlayerIndex((dealerIndex) % players.length);
     
     if (firstActivePlayerIndex === -1) {
         console.log("⚠️ No active player found. Skipping betting round.");
