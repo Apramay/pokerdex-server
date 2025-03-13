@@ -307,7 +307,7 @@ function nextRound() {
     }
 
     broadcastGameState();
-    setTimeout(startFlopBetting, 1000);
+    setTimeout(() => startFlopBetting(), 1500);
 }
 
 function showdown() {
@@ -658,38 +658,34 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
     }
 
 
-
 function handleCheck(data) {
-    console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
-console.log("Before updating playersWhoActed:", [...playersWhoActed]);
+        console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+    console.log("Before updating playersWhoActed:", [...playersWhoActed]);
+
 
     const player = players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
-        return;
-    }
+    if (!player) return;
+            console.error("Player not found:", data.playerName);
+
 
     if (currentBet === 0 || player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
-        playersWhoActed.add(player.name); // ✅ Mark player as having acted
-        console.log("After updating playersWhoActed:", [...playersWhoActed]);
+        playersWhoActed.add(player.name);
+                console.log("After updating playersWhoActed:", [...playersWhoActed]);
 
-
-        // ✅ Move to the next player
-        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
 
         if (isBettingRoundOver()) {
-            console.log("All players have checked/called. Moving to next round.");
             setTimeout(nextRound, 1000);
         } else {
-            console.log(`Next player: ${players[currentPlayerIndex].name}`);
-            currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-            broadcastGameState();
+            // ✅ Ensure next player is correctly selected before broadcasting state
+            setTimeout(() => {
+                currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+                broadcastGameState();
+            }, 500);
         }
-    } else {
-        console.log("Check not allowed, there is a bet to match.");
     }
 }
+
 // Start the server
 server.listen(process.env.PORT || 8080, () => {
     console.log(`WebSocket server started on port ${server.address().port}`);
