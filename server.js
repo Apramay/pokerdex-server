@@ -271,9 +271,16 @@ function startFlopBetting() {
     currentBet = 0;
     playersWhoActed.clear();
 
-    // ✅ Get the first active player left of the dealer
-    currentPlayerIndex = getNextPlayerIndex(dealerIndex);
-    console.log(`🎯 Starting flop betting with: ${players[currentPlayerIndex].name}`);
+    et firstActivePlayerIndex = getNextPlayerIndex((dealerIndex + 1) % players.length);
+    
+    if (firstActivePlayerIndex === -1) {
+        console.log("⚠️ No active player found. Skipping betting round.");
+        setTimeout(nextRound, 1000);
+        return;
+    }
+
+    currentPlayerIndex = firstActivePlayerIndex;
+    console.log(`🎯 Starting post-flop betting with: ${players[currentPlayerIndex].name}`);
 
     bettingRound();
 }
