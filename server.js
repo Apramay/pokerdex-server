@@ -273,6 +273,7 @@ function startFlopBetting() {
     // ✅ Get the first active player left of the dealer
     currentPlayerIndex = getNextPlayerIndex(dealerIndex);
     console.log(`🎯 Starting post-flop betting with: ${players[currentPlayerIndex].name}`);
+    playersWhoActed.clear();
 
     // ✅ Broadcast correct first player
     broadcast({
