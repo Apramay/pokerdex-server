@@ -553,18 +553,7 @@ wss.on('connection', function connection(ws) {
         broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
     });
 });
-if (data.type === "getGameState") {
-    ws.send(JSON.stringify({
-        type: "updateGameState",
-        players,
-        tableCards,
-        pot,
-        currentBet,
-        round,
-        currentPlayerIndex,
-        dealerIndex
-    }));
-}
+
 // Action handlers
 function handleRaise(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
