@@ -292,13 +292,13 @@ function nextRound() {
     } else if (round === 1) {
         round ++;
         if (deckForGame.length > 0) {
-            tableCards.push(dealCard(deckForGame));
+                    tableCards.push(dealHand(deckForGame, 1)[0]); // Turn
         broadcast({ type: "message", text: `Turn: ${JSON.stringify(tableCards[3])}` });
         }
     } else if (round === 2) {
         round++;
         if (deckForGame.length > 0) {
-            tableCards.push(dealCard(deckForGame));
+                    tableCards.push(dealHand(deckForGame, 1)[0]); // Turn
         broadcast({ type: "message", text: `River: ${JSON.stringify(tableCards[4])}` });
         }
     } else if (round === 3) {
