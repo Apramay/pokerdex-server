@@ -125,37 +125,52 @@ function startNewHand() {
     broadcastGameState();
 }
 
-// Function to set up blinds for the new hand
 function setupBlinds() {
     pot = 0;
     const smallBlindIndex = (dealerIndex + 1) % players.length;
     const bigBlindIndex = (dealerIndex + 2) % players.length;
 
-    postBlind(players[smallBlindIndex], smallBlindAmount);
-    postBlind(players[bigBlindIndex], bigBlindAmount);
+    console.log(`🎲 Setting up blinds: SB -> ${players[smallBlindIndex].name}, BB -> ${players[bigBlindIndex].name}`);
 
-    currentBet = bigBlindAmount;
-    currentPlayerIndex = (bigBlindIndex + 1) % players.length;
-    
+    postBlind(players[smallBlindIndex], smallBlindAmount);         // ✅ Small Blind posts
+    postBlind(players[bigBlindIndex], bigBlindAmount, true);      // ✅ Big Blind posts & updates `currentBet`
+
+    currentPlayerIndex = (bigBlindIndex + 1) % players.length; // ✅ First action goes to UTG (next after BB)
+
     playersWhoActed.clear();
 
-    broadcastGameState();
-    broadcast({ type: "blindsPosted", smallBlind: players[smallBlindIndex].name, bigBlind: players[bigBlindIndex].name });
-    setTimeout(bettingRound, 500);
+    console.log(`🎯 First action: ${players[currentPlayerIndex].name}`);
 
+    broadcastGameState();  // ✅ Ensures frontend gets the correct initial state
+
+    broadcast({ 
+        type: "blindsPosted", 
+        smallBlind: players[smallBlindIndex].name, 
+        bigBlind: players[bigBlindIndex].name 
+    });
+
+    setTimeout(bettingRound, 500); // ✅ Start the first betting round
 }
 
 
-function postBlind(player, amount) {
+
+function postBlind(player, amount, isBigBlind = false) {
     const blindAmount = Math.min(amount, player.tokens);
     player.tokens -= blindAmount;
     player.currentBet = blindAmount;
     pot += blindAmount;
+
     if (player.tokens === 0) {
         player.allIn = true;
     }
-    console.log(`${player.name} posts ${blindAmount}.`);
+
+    if (isBigBlind) {  // ✅ Added: Ensure `currentBet` is set to the BB amount
+        currentBet = blindAmount;
+    }
+
+    console.log(`💰 ${player.name} posts ${blindAmount}. Pot: ${pot}, Current Bet: ${currentBet}`);
 }
+
 
 
 function getNextPlayerIndex(currentIndex) {
