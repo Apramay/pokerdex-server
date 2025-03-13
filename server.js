@@ -267,17 +267,15 @@ function shuffleDeck(deck) {
 }
 
 
-
 function startFlopBetting() {
     currentBet = 0;
-    
-    // ✅ Ensure betting starts with the first active player left of the dealer
-   
-        currentPlayerIndex = (dealerIndex + 1) % players.length;
-
     playersWhoActed.clear();
-        bettingRound();
 
+    // ✅ Get the first active player left of the dealer
+    currentPlayerIndex = getNextPlayerIndex(dealerIndex);
+    console.log(`🎯 Starting flop betting with: ${players[currentPlayerIndex].name}`);
+
+    bettingRound();
 }
 
 function nextRound() {
