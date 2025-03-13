@@ -266,24 +266,23 @@ function shuffleDeck(deck) {
     return deck;
 }
 
-
 function startFlopBetting() {
     currentBet = 0;
     playersWhoActed.clear();
 
-    let firstActivePlayerIndex = getNextPlayerIndex((dealerIndex) % players.length);
-    
-    if (firstActivePlayerIndex === -1) {
-        console.log("⚠️ No active player found. Skipping betting round.");
-        setTimeout(nextRound, 1000);
-        return;
-    }
-
-    currentPlayerIndex = firstActivePlayerIndex;
+    // ✅ Get the first active player left of the dealer
+    currentPlayerIndex = getNextPlayerIndex(dealerIndex);
     console.log(`🎯 Starting post-flop betting with: ${players[currentPlayerIndex].name}`);
+
+    // ✅ Broadcast correct first player
+    broadcast({
+        type: "playerTurn",
+        playerName: players[currentPlayerIndex].name
+    });
 
     bettingRound();
 }
+
 
 function nextRound() {
     console.log("nextRound() called. Current round:", round);
@@ -666,27 +665,24 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
     }
     }
 
-
 function handleCheck(data) {
-        console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+    console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
     console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
-
     const player = players.find(p => p.name === data.playerName);
-    if (!player) return;
-            console.error("Player not found:", data.playerName);
-
+    if (!player) {
+        console.error("❌ Player not found:", data.playerName);
+        return; // ✅ Prevents processing an invalid action
+    }
 
     if (currentBet === 0 || player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
         playersWhoActed.add(player.name);
-                console.log("After updating playersWhoActed:", [...playersWhoActed]);
-
+        console.log("After updating playersWhoActed:", [...playersWhoActed]);
 
         if (isBettingRoundOver()) {
             setTimeout(nextRound, 1000);
         } else {
-            // ✅ Ensure next player is correctly selected before broadcasting state
             setTimeout(() => {
                 currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
                 broadcastGameState();
@@ -694,6 +690,7 @@ function handleCheck(data) {
         }
     }
 }
+
 
 // Start the server
 server.listen(process.env.PORT || 8080, () => {
