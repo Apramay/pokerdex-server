@@ -528,48 +528,51 @@ function isOnePair(hand, ranks) {
 }
 
 // WebSocket server event handling
-wss.on("connection", function connection(ws) {
-    console.log("✅ A new client connected");
+wss.on('connection', function connection(ws) {
+    console.log('✅ A new client connected');
 
-    ws.on("message", function incoming(message) {
-        console.log("📩 Received message from client:", message);
+    ws.on('message', function incoming(message) {
+        console.log('📩 Received message from client:', message);
 
         try {
             const data = JSON.parse(message);
 
-            if (data.type === "join") {
+            if (data.type === 'join') {
                 const player = {
                     name: data.name,
-                    ws: ws,  // ✅ Save WebSocket session
+                    ws: ws,
                     tokens: 1000,
-                    hand: [],
+                    hand:[],
                     currentBet: 0,
-                    status: "active",
+                    status: 'active',
                     allIn: false
                 };
-
                 players.push(player);
                 console.log(`➕ Player ${data.name} joined. Total players: ${players.length}`);
-                broadcast({ type: "updatePlayers", players: players.map(({ ws, ...player }) => player) });
-            } else if (data.type === "raise") {
-                handleRaise(data, ws);  // ✅ Pass WebSocket session
-            } else if (data.type === "fold") {
-                handleFold(data, ws);
-            } else if (data.type === "call") {
-                handleCall(data, ws);
-            } else if (data.type === "check") {
-                handleCheck(data, ws);
+                broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
+            } else if (data.type === 'startGame') {
+                startGame();
+            } else if (data.type === 'bet') {
+                handleBet(data);
+            } else if (data.type === 'raise') {
+                handleRaise(data);
+            } else if (data.type === 'call') {
+                handleCall(data);
+            } else if (data.type === 'fold') {
+                handleFold(data);
+            } else if (data.type === 'check') {
+                handleCheck(data);
             }
 
         } catch (error) {
-            console.error("❌ Error parsing message:", error);
+            console.error('❌ Error parsing message:', error);
         }
     });
 
-    ws.on("close", () => {
-        console.log("❌ Client disconnected");
+    ws.on('close', () => {
+        console.log('❌ Client disconnected');
         players = players.filter(player => player.ws !== ws);
-        broadcast({ type: "updatePlayers", players: players.map(({ ws, ...player }) => player) });
+        broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
     });
 });
 
