@@ -612,13 +612,18 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
     broadcastGameState();
 }
 
-function handleCall(data) {
+function handleCall(data, ws) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
     console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
         console.error("Player not found:", data.playerName);
+        return;
+    }
+ if (players[currentPlayerIndex].name !== data.playerName) {
+        console.warn(`⛔ ${data.playerName} tried to act out of turn!`);
+        ws.send(JSON.stringify({ type: "error", message: "It's not your turn!" }));
         return;
     }
 
