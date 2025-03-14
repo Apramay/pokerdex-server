@@ -117,6 +117,8 @@ function startNewHand() {
         pot += player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
         player.currentBet = player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
     });
+    currentBet = bigBlindAmount;
+
 
     // Set the starting player (after the big blind)
     currentPlayerIndex = (bigBlindIndex + 1) % players.length;
