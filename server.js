@@ -102,9 +102,7 @@ function startNewHand() {
     // Determine small blind and big blind indices
     let smallBlindIndex = (dealerIndex + 1) % players.length;
     let bigBlindIndex = (dealerIndex + 2) % players.length;
-    if (players.length === 2) {
-        bigBlindIndex = (dealerIndex + 1) % players.length;
-    }
+
 
     // Reset player states and deal cards
     players.forEach((player, index) => {
