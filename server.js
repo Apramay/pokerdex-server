@@ -113,7 +113,7 @@ function startNewHand() {
         player.status = "active"; // Reset player status
         player.isSmallBlind = index === smallBlindIndex;
         player.isBigBlind = index === bigBlindIndex;
-        player.chips -= player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
+        player.tokens -= player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
         pot += player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
         player.currentBet = player.isSmallBlind ? smallBlindAmount : player.isBigBlind ? bigBlindAmount : 0;
     });
