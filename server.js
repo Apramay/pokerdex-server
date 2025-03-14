@@ -612,18 +612,13 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
     broadcastGameState();
 }
 
-function handleCall(data, ws) {
+function handleCall(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
     console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
     const player = players.find(p => p.name === data.playerName);
     if (!player) {
         console.error("Player not found:", data.playerName);
-        return;
-    }
- if (players[currentPlayerIndex].name !== data.playerName) {
-        console.warn(`⛔ ${data.playerName} tried to act out of turn!`);
-        ws.send(JSON.stringify({ type: "error", message: "It's not your turn!" }));
         return;
     }
 
@@ -673,17 +668,15 @@ function handleFold(data) {
     playersWhoActed.add(player.name);
     console.log("After updating playersWhoActed:", [...playersWhoActed]);
 
-    // ✅ Move to the next player only once
-    const nextIndex = getNextPlayerIndex(currentPlayerIndex);
-    if (nextIndex !== -1) {
-        currentPlayerIndex = nextIndex;
-    }
+    // Move to the next player
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);  // <--- This might be causing the skip
 
     if (isBettingRoundOver()) {
-        console.log("✅ All players have acted. Moving to next round.");
+        console.log("All players have called or checked. Moving to next round.");
         setTimeout(nextRound, 1000);
     } else {
-        broadcastGameState();  // ✅ Only update the UI once
+        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);  // <--- This is causing an extra skip
+        broadcastGameState();
     }
 }
 
