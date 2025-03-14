@@ -651,7 +651,6 @@ function handleCall(data) {
         }
     }
 }
-
 function handleFold(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
     console.log("Before updating playersWhoActed:", [...playersWhoActed]);
@@ -668,15 +667,17 @@ function handleFold(data) {
     playersWhoActed.add(player.name);
     console.log("After updating playersWhoActed:", [...playersWhoActed]);
 
-    // Move to the next player
-    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);  // <--- This might be causing the skip
+    // ✅ Move to the next player only once
+    const nextIndex = getNextPlayerIndex(currentPlayerIndex);
+    if (nextIndex !== -1) {
+        currentPlayerIndex = nextIndex;
+    }
 
     if (isBettingRoundOver()) {
-        console.log("All players have called or checked. Moving to next round.");
+        console.log("✅ All players have acted. Moving to next round.");
         setTimeout(nextRound, 1000);
     } else {
-        currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);  // <--- This is causing an extra skip
-        broadcastGameState();
+        broadcastGameState();  // ✅ Only update the UI once
     }
 }
 
