@@ -57,7 +57,7 @@ function broadcastGameState() {
             type: "updateGameState",
             players: players.map(({ ws, hand, ...playerData }) => ({
                 ...playerData, 
-                hand: player.name === playerData.name ? hand : [] // ✅ Only send their own hand
+                hand: player.name === playerData.name ? hand : [{ rank: "back", suit: "back" }]
             })),
             tableCards,
             pot,
