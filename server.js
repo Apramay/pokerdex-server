@@ -607,7 +607,10 @@ console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
     // Move to the next player
     currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
-
+broadcast({
+        type: "updateActionHistory",
+        action: `${data.playerName} raised ${raiseAmount}`
+    });
     // Broadcast the updated game state
     broadcastGameState();
 }
@@ -633,6 +636,10 @@ function handleCall(data) {
     // ✅ Add player to "acted" set
     playersWhoActed.add(player.name);
     console.log("After updating playersWhoActed:", [...playersWhoActed]);
+    broadcast({
+        type: "updateActionHistory",
+        action: `${data.playerName} called`
+    });
 
     // ✅ Check if ALL players have acted before moving forward
     if (isBettingRoundOver()) {
@@ -666,6 +673,10 @@ function handleFold(data) {
     // ✅ Mark this player as having acted
     playersWhoActed.add(player.name);
     console.log("After updating playersWhoActed:", [...playersWhoActed]);
+     broadcast({
+        type: "updateActionHistory",
+        action: `${data.playerName} folded`
+    });
 
     // ✅ Move to the next player only once
     const nextIndex = getNextPlayerIndex(currentPlayerIndex);
@@ -696,6 +707,11 @@ function handleCheck(data) {
         console.log(`${player.name} checked.`);
         playersWhoActed.add(player.name);
         console.log("After updating playersWhoActed:", [...playersWhoActed]);
+         broadcast({
+            type: "updateActionHistory",
+            action: `${data.playerName} checked`
+        });
+
 
         if (isBettingRoundOver()) {
             setTimeout(nextRound, 1000);
