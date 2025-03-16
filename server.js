@@ -335,20 +335,45 @@ function nextRound() {
 }
 
 function showdown() {
-    console.log("Showdown!");
+    console.log("🏆 Showdown!");
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
     let winners = determineWinners(activePlayers);
+
     winners.forEach(winner => {
-        console.log(`${winner.name} wins the hand!`);});
-    distributePot();
-    broadcastGameState();
-    broadcast({
-        type: "winner",
-        winners: winners.map(w => w.name),
-        pot: pot
+        console.log(`🎉 ${winner.name} wins the hand!`);
     });
-    setTimeout(resetGame, 3000);
+
+    // ✅ Automatically reveal the winner's hand
+    let revealedHands = winners.map(winner => ({
+        playerName: winner.name,
+        hand: winner.hand
+    }));
+
+    // ✅ Broadcast revealed winner hands to all players
+    broadcast({
+        type: "showdown",
+        winners: revealedHands,
+    });
+
+    // ✅ Record winning hand in history
+    broadcast({
+        type: "updateActionHistory",
+        action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${displayHand(winners[0].hand)}`
+    });
+
+    distributePot();
+
+    // ✅ Give players the option to "Show" or "Hide" their hands
+    setTimeout(() => {
+        broadcast({
+            type: "showOrHideCards",
+            remainingPlayers: activePlayers.filter(p => !winners.includes(p)).map(p => p.name)
+        });
+    }, 2000);
+
+    setTimeout(resetGame, 5000); // Delay before next round
 }
+
 
 function distributePot() {
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
