@@ -493,24 +493,25 @@ function isFlush(hand, suits) {
 }
 
 function isStraight(hand, ranks) {
-    const rankValues = hand.map(card => rankValues[card.rank])
+    const handValues = hand.map(card => rankValues[card.rank]) // ✅ Renamed to avoid conflict
         .sort((a, b) => a - b);
 
     // Normal straight check
-    for (let i = 0; i <= rankValues.length - 5; i++) {
-        if (rankValues[i + 4] - rankValues[i] === 4 &&
-            new Set(rankValues.slice(i, i + 5)).size === 5) {
+    for (let i = 0; i <= handValues.length - 5; i++) {
+        if (handValues[i + 4] - handValues[i] === 4 &&
+            new Set(handValues.slice(i, i + 5)).size === 5) {
             return true;
         }
     }
 
-    // Special case: A, 2, 3, 4, 5
-    if (rankValues.includes(14) && rankValues.slice(0, 4).join() === "2,3,4,5") {
+    // Special case: A, 2, 3, 4, 5 (Low Straight)
+    if (handValues.includes(14) && handValues.slice(0, 4).join() === "2,3,4,5") {
         return true;
     }
 
     return false;
 }
+
 
 function isThreeOfAKind(hand, ranks) {
     for (let rank of ranks) {
