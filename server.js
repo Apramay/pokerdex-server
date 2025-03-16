@@ -423,6 +423,9 @@ function resetGame() {
                 player.revealed = false; // ✅ Reset revealed status
 
     });
+broadcast({
+        type: "resetRevealedHands"
+    });
 
     console.log(`🎲 New dealer is: ${players[dealerIndex].name}`);
 
