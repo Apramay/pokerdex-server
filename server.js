@@ -400,8 +400,6 @@ function resetGame() {
     dealerIndex = (dealerIndex + 1) % players.length; // Move dealer button
     startNewHand();
 }
-
-
 function determineWinners(playerList) {
     if (playerList.length === 0) {
         return [];
@@ -409,16 +407,25 @@ function determineWinners(playerList) {
 
     let bestHandValue = -1;
     let winners = [];
+    let bestHandDetails = null; // To store best hand details for tiebreakers
 
     playerList.forEach(player => {
         if (player.status !== "folded") {
-            const handValue = evaluateHand(player.hand.concat(tableCards));
+            const fullHand = player.hand.concat(tableCards);
+            const { handValue, bestCards } = evaluateHand(fullHand);
 
             if (handValue > bestHandValue) {
                 bestHandValue = handValue;
                 winners = [player];
+                bestHandDetails = bestCards;
             } else if (handValue === bestHandValue) {
-                winners.push(player);
+                // ✅ Handle tie cases by comparing kicker
+                if (compareHands(bestCards, bestHandDetails) > 0) {
+                    winners = [player]; // New best kicker
+                    bestHandDetails = bestCards;
+                } else if (compareHands(bestCards, bestHandDetails) === 0) {
+                    winners.push(player); // Exact tie, add both winners
+                }
             }
         }
     });
@@ -426,23 +433,26 @@ function determineWinners(playerList) {
     return winners;
 }
 
+
 // Function to evaluate the hand of a player
 function evaluateHand(cards) {
-    const hand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
-    const ranks = hand.map(card => card.rank);
-    const suits = hand.map(card => card.suit);
+    const sortedHand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
+    const ranks = sortedHand.map(card => card.rank);
+    const suits = sortedHand.map(card => card.suit);
 
-    if (isRoyalFlush(hand, ranks, suits)) return 10;
-    if (isStraightFlush(hand, ranks, suits)) return 9;
-    if (isFourOfAKind(hand, ranks)) return 8;
-    if (isFullHouse(hand, ranks)) return 7;
-    if (isFlush(hand, suits)) return 6;
-    if (isStraight(hand, ranks)) return 5;
-    if (isThreeOfAKind(hand, ranks)) return 4;
-    if (isTwoPair(hand, ranks)) return 3;
-    if (isOnePair(hand, ranks)) return 2;
-    return 1; // High card
+    if (isRoyalFlush(sortedHand, ranks, suits)) return { handValue: 10, bestCards: sortedHand };
+    if (isStraightFlush(sortedHand, ranks, suits)) return { handValue: 9, bestCards: sortedHand };
+    if (isFourOfAKind(sortedHand, ranks)) return { handValue: 8, bestCards: sortedHand };
+    if (isFullHouse(sortedHand, ranks)) return { handValue: 7, bestCards: sortedHand };
+    if (isFlush(sortedHand, suits)) return { handValue: 6, bestCards: sortedHand };
+    if (isStraight(sortedHand, ranks)) return { handValue: 5, bestCards: sortedHand };
+    if (isThreeOfAKind(sortedHand, ranks)) return { handValue: 4, bestCards: sortedHand };
+    if (isTwoPair(sortedHand, ranks)) return { handValue: 3, bestCards: sortedHand };
+    if (isOnePair(sortedHand, ranks)) return { handValue: 2, bestCards: sortedHand };
+
+    return { handValue: 1, bestCards: sortedHand.slice(0, 5) }; // High card
 }
+
 
 // Helper functions to check for different hand types
 function isRoyalFlush(hand, ranks, suits) {
@@ -483,16 +493,22 @@ function isFlush(hand, suits) {
 }
 
 function isStraight(hand, ranks) {
-    const rankValues = hand.map(card => {
-        if (card.rank === "A") return 14;
-        if (card.rank === "K") return 13;
-        if (card.rank === "Q") return 12;
-        if (card.rank === "J") return 11;
-        return parseInt(card.rank);
-    }).sort((a, b) => a - b);
+    const rankValues = hand.map(card => rankValues[card.rank])
+        .sort((a, b) => a - b);
 
-    if (rankValues[4] - rankValues[0] === 4) return true;
-    if (rankValues[3] - rankValues[0] === 3 && rankValues[4] === 14 && rankValues[3] === 5) return true; // Special case for A,2,3,4,5
+    // Normal straight check
+    for (let i = 0; i <= rankValues.length - 5; i++) {
+        if (rankValues[i + 4] - rankValues[i] === 4 &&
+            new Set(rankValues.slice(i, i + 5)).size === 5) {
+            return true;
+        }
+    }
+
+    // Special case: A, 2, 3, 4, 5
+    if (rankValues.includes(14) && rankValues.slice(0, 4).join() === "2,3,4,5") {
+        return true;
+    }
+
     return false;
 }
 
@@ -526,6 +542,14 @@ function isOnePair(hand, ranks) {
     }
     return false;
 }
+function compareHands(handA, handB) {
+    for (let i = 0; i < Math.min(handA.length, handB.length); i++) {
+        if (rankValues[handA[i].rank] > rankValues[handB[i].rank]) return 1;
+        if (rankValues[handA[i].rank] < rankValues[handB[i].rank]) return -1;
+    }
+    return 0; // Exact tie
+}
+
 
 // WebSocket server event handling
 wss.on('connection', function connection(ws) {
