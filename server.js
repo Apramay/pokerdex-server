@@ -393,7 +393,7 @@ function resetGame() {
     pot = 0;
 
     // ✅ Move the dealer button to the next active player
-    dealerIndex = getNextActivePlayer(dealerIndex);
+    dealerIndex = (dealerIndex + 1) % players.length;
 
     // ✅ Reset all players for a new round
     players.forEach(player => {
