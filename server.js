@@ -391,15 +391,23 @@ function resetGame() {
     round = 0;
     tableCards = [];
     pot = 0;
+
+    // ✅ Move the dealer button to the next active player
+    dealerIndex = getNextActivePlayer(dealerIndex);
+
+    // ✅ Reset all players for a new round
     players.forEach(player => {
         player.hand = [];
         player.currentBet = 0;
         player.status = "active";
         player.allIn = false;
     });
-    dealerIndex = (dealerIndex + 1) % players.length; // Move dealer button
-    startNewHand();
+
+    console.log(`🎲 New dealer is: ${players[dealerIndex].name}`);
+
+    startNewHand(); // ✅ Start the new round with correct dealer
 }
+
 function determineWinners(playerList) {
     if (playerList.length === 0) {
         return [];
