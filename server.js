@@ -340,6 +340,28 @@ function showdown() {
     let winners = determineWinners(activePlayers);
     winners.forEach(winner => {
         console.log(`${winner.name} wins the hand!`);});
+    let winningHands = winners.map(winner => ({ name: winner.name, hand: winner.hand }));
+    broadcast({
+        type: "showdown",
+        winners: winners.map(w => w.name),
+        pot: pot,
+        winningHands
+    });
+    let revealOptions = activePlayers.map(player => ({
+        name: player.name,
+        canReveal: true
+    }));
+
+    broadcast({
+        type: "revealOptions",
+        players: revealOptions
+    });
+
+    // Store hand history for the sidebar
+    broadcast({
+        type: "updateSidebar",
+        history: winningHands
+    });
     distributePot();
     broadcastGameState();
     broadcast({
