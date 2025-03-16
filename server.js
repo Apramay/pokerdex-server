@@ -584,7 +584,6 @@ function compareHands(handA, handB) {
     return 0; // Exact tie
 }
 
-
 // WebSocket server event handling
 wss.on('connection', function connection(ws) {
     console.log('✅ A new client connected');
@@ -595,12 +594,34 @@ wss.on('connection', function connection(ws) {
         try {
             const data = JSON.parse(message);
 
+            // ✅ Handle "Show or Hide" Decision
+            if (data.type === "showHideDecision") {
+                let player = players.find(p => p.name === data.playerName);
+                if (!player) return;
+
+                if (data.choice === "show") {
+                    console.log(`👀 ${player.name} chose to SHOW their hand!`);
+                    broadcast({
+                        type: "updateActionHistory",
+                        action: `👀 ${player.name} revealed: ${displayHand(player.hand)}`
+                    });
+                } else {
+                    console.log(`🙈 ${player.name} chose to HIDE their hand.`);
+                    broadcast({
+                        type: "updateActionHistory",
+                        action: `🙈 ${player.name} chose to keep their hand hidden.`
+                    });
+                }
+                return; // ✅ Ensure we exit here after handling this case
+            }
+
+            // ✅ Handle other game actions separately
             if (data.type === 'join') {
                 const player = {
                     name: data.name,
                     ws: ws,
                     tokens: 1000,
-                    hand:[],
+                    hand: [],
                     currentBet: 0,
                     status: 'active',
                     allIn: false
@@ -608,6 +629,7 @@ wss.on('connection', function connection(ws) {
                 players.push(player);
                 console.log(`➕ Player ${data.name} joined. Total players: ${players.length}`);
                 broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
+
             } else if (data.type === 'startGame') {
                 startGame();
             } else if (data.type === 'bet') {
@@ -633,6 +655,7 @@ wss.on('connection', function connection(ws) {
         broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
     });
 });
+
 
 // Action handlers
 function handleRaise(data) {
