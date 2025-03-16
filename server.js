@@ -340,34 +340,15 @@ function showdown() {
     let winners = determineWinners(activePlayers);
     winners.forEach(winner => {
         console.log(`${winner.name} wins the hand!`);});
-    let winningHands = winners.map(winner => ({ name: winner.name, hand: winner.hand }));
+    distributePot();
+    broadcastGameState();
     broadcast({
-        type: "showdown",
+        type: "winner",
         winners: winners.map(w => w.name),
-        pot: pot,
-        winningHands
+        pot: pot
     });
-     let revealOptions = activePlayers
-        .filter(player => !winners.some(w => w.name === player.name)) // Exclude winners (they are auto-revealed)
-        .map(player => ({ name: player.name, canReveal: true }));
-
- broadcast({
-        type: "showdown",
-        winners: winners.map(w => w.name),
-        pot: pot,
-        winningHands,
-        revealOptions
-    });
-
-    // Store winning hand history for the sidebar
-    broadcast({
-        type: "updateSidebar",
-        history: winningHands
-    });
-
-    setTimeout(resetGame, 5000);
+    setTimeout(resetGame, 3000);
 }
-
 
 function distributePot() {
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
@@ -420,11 +401,6 @@ function resetGame() {
         player.currentBet = 0;
         player.status = "active";
         player.allIn = false;
-                player.revealed = false; // ✅ Reset revealed status
-
-    });
-broadcast({
-        type: "resetRevealedHands"
     });
 
     console.log(`🎲 New dealer is: ${players[dealerIndex].name}`);
@@ -734,13 +710,6 @@ function handleFold(data) {
         type: "updateActionHistory",
         action: `${data.playerName} folded`
     });
-    let activePlayers = players.filter(p => p.status === "active");
-    if (activePlayers.length === 1) {
-        broadcast({
-            type: "winnerCanReveal",
-            winner: activePlayers[0].name
-        });
-    }
 
     // ✅ Move to the next player only once
     const nextIndex = getNextPlayerIndex(currentPlayerIndex);
