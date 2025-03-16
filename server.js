@@ -347,30 +347,27 @@ function showdown() {
         pot: pot,
         winningHands
     });
-    let revealOptions = activePlayers.map(player => ({
-        name: player.name,
-        canReveal: true
-    }));
+     let revealOptions = activePlayers
+        .filter(player => !winners.some(w => w.name === player.name)) // Exclude winners (they are auto-revealed)
+        .map(player => ({ name: player.name, canReveal: true }));
 
-    broadcast({
-        type: "revealOptions",
-        players: revealOptions
+ broadcast({
+        type: "showdown",
+        winners: winners.map(w => w.name),
+        pot: pot,
+        winningHands,
+        revealOptions
     });
 
-    // Store hand history for the sidebar
+    // Store winning hand history for the sidebar
     broadcast({
         type: "updateSidebar",
         history: winningHands
     });
-    distributePot();
-    broadcastGameState();
-    broadcast({
-        type: "winner",
-        winners: winners.map(w => w.name),
-        pot: pot
-    });
-    setTimeout(resetGame, 3000);
+
+    setTimeout(resetGame, 5000);
 }
+
 
 function distributePot() {
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
