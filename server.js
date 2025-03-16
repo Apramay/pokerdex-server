@@ -732,6 +732,13 @@ function handleFold(data) {
         type: "updateActionHistory",
         action: `${data.playerName} folded`
     });
+    let activePlayers = players.filter(p => p.status === "active");
+    if (activePlayers.length === 1) {
+        broadcast({
+            type: "winnerCanReveal",
+            winner: activePlayers[0].name
+        });
+    }
 
     // ✅ Move to the next player only once
     const nextIndex = getNextPlayerIndex(currentPlayerIndex);
