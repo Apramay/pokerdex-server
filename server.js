@@ -420,6 +420,8 @@ function resetGame() {
         player.currentBet = 0;
         player.status = "active";
         player.allIn = false;
+                player.revealed = false; // ✅ Reset revealed status
+
     });
 
     console.log(`🎲 New dealer is: ${players[dealerIndex].name}`);
