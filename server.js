@@ -348,10 +348,11 @@ function showdown() {
     });
 
     // ✅ Automatically reveal the winner's hand
-    let revealedHands = winners.map(winner => ({
-        playerName: winner.name,
-        hand: winner.hand
+     let revealedHands = winners.map(({ player, bestCards }) => ({
+        playerName: player.name,
+        bestHand: bestCards  // ✅ FIX: Ensure bestHand is included
     }));
+    
 
     // ✅ Broadcast revealed winner hands to all players
     broadcast({
@@ -363,7 +364,7 @@ function showdown() {
      winners.forEach(({ player, bestCards }) => {
         broadcast({
             type: "updateActionHistory",
-            action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Best Hand: ${formatHand(bestCards)}`
+            action: `🏆 Winner: ${winners.map(w => w.player.name).join(", ")} - Best Hand: ${formatHand(bestCards)}`
         });
     });
 
