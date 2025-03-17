@@ -368,16 +368,19 @@ function showdown() {
     distributePot();
 
     // ✅ Give players the option to "Show" or "Hide" their hands
-    setTimeout(() => {
+  let remainingPlayers = activePlayers.filter(p => !winners.includes(p)).map(p => p.name);
+    
+    if (remainingPlayers.length > 0) {
+        // ✅ Wait for them to choose before starting the next round
         broadcast({
             type: "showOrHideCards",
-            remainingPlayers: activePlayers.filter(p => !winners.includes(p)).map(p => p.name)
+            remainingPlayers
         });
-    }, 2000);
-
-    setTimeout(resetGame, 5000); // Delay before next round
+    } else {
+        // ✅ If no one needs to choose, start the next hand immediately
+        setTimeout(resetGame, 5000);
+    }
 }
-
 
 function distributePot() {
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
@@ -600,24 +603,31 @@ wss.on('connection', function connection(ws) {
 
             // ✅ Handle "Show or Hide" Decision
             if (data.type === "showHideDecision") {
-                let player = players.find(p => p.name === data.playerName);
-                if (!player) return;
+            let player = players.find(p => p.name === data.playerName);
+            if (!player) return;
 
-                if (data.choice === "show") {
-                    console.log(`👀 ${player.name} chose to SHOW their hand!`);
-                    broadcast({
-                        type: "updateActionHistory",
-                        action: `👀 ${player.name} revealed: ${displayHand(player.hand)}`
-                    });
-                } else {
-                    console.log(`🙈 ${player.name} chose to HIDE their hand.`);
-                    broadcast({
-                        type: "updateActionHistory",
-                        action: `🙈 ${player.name} chose to keep their hand hidden.`
-                    });
-                }
-                return; // ✅ Ensure we exit here after handling this case
+            if (data.choice === "show") {
+                console.log(`👀 ${player.name} chose to SHOW their hand!`);
+                broadcast({
+                    type: "updateActionHistory",
+                    action: `👀 ${player.name} revealed: ${formatHand(player.hand)}`
+                });
+            } else {
+                console.log(`🙈 ${player.name} chose to HIDE their hand.`);
+                broadcast({
+                    type: "updateActionHistory",
+                    action: `🙈 ${player.name} chose to keep their hand hidden.`
+                });
             }
+
+            // ✅ Remove player from the waiting list
+            playersWhoNeedToDecide = playersWhoNeedToDecide.filter(p => p !== data.playerName);
+
+            // ✅ If all players have chosen, start the next round
+            if (playersWhoNeedToDecide.length === 0) {
+                setTimeout(resetGame, 3000);
+            }
+        }
 
             // ✅ Handle other game actions separately
             if (data.type === 'join') {
