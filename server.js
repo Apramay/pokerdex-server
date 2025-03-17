@@ -73,6 +73,7 @@ function broadcastGameState() {
     });
 }
 
+
 // Function to start the game
 function startGame() {
     if (players.length < 2) {
@@ -152,6 +153,9 @@ function setupBlinds() {
     setTimeout(bettingRound, 500); // ✅ Start the first betting round
 }
 
+function formatHand(hand) {
+    return hand.map(card => `${card.rank} of ${card.suit}`).join(", ");
+}
 
 
 function postBlind(player, amount, isBigBlind = false) {
@@ -358,7 +362,7 @@ function showdown() {
     // ✅ Record winning hand in history
     broadcast({
         type: "updateActionHistory",
-        action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${displayHand(winners[0].hand)}`
+        action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${formatHand(winners[0].hand)}`
     });
 
     distributePot();
