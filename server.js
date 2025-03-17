@@ -370,14 +370,25 @@ function showdown() {
     // ✅ Give players the option to "Show" or "Hide" their hands
   let remainingPlayers = activePlayers.filter(p => !winners.includes(p)).map(p => p.name);
     
-    if (remainingPlayers.length > 0) {
-        // ✅ Wait for them to choose before starting the next round
+   if (remainingPlayers.length > 0) {
         broadcast({
             type: "showOrHideCards",
             remainingPlayers
         });
+
+        // ⏳ Auto-hide after 10 seconds if no action is taken
+        setTimeout(() => {
+            remainingPlayers.forEach(playerName => {
+                console.log(`⏳ ${playerName} took too long! Auto-hiding cards.`);
+                broadcast({
+                    type: "updateActionHistory",
+                    action: `⏳ ${playerName} did not act in time. Cards hidden automatically.`
+                });
+            });
+
+            setTimeout(resetGame, 3000); // ✅ Start new hand after auto-hiding
+        }, 10000);
     } else {
-        // ✅ If no one needs to choose, start the next hand immediately
         setTimeout(resetGame, 5000);
     }
 }
