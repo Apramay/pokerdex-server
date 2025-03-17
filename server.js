@@ -360,10 +360,13 @@ function showdown() {
     });
 
     // ✅ Record winning hand in history
-    broadcast({
-        type: "updateActionHistory",
-        action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${formatHand(winners[0].hand)}`
+     winners.forEach(({ player, bestCards }) => {
+        broadcast({
+            type: "updateActionHistory",
+            action: `🏆 Winner: ${player.name} - Best Hand: ${displayHand(bestCards)}`
+        });
     });
+
 
     distributePot();
 
