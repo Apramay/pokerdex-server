@@ -467,7 +467,7 @@ function determineWinners(playerList) {
 
             if (handValue > bestHandValue) {
                 bestHandValue = handValue;
-                winners = [player];
+                winners = [{ player, bestCards }];
                 bestHandDetails = bestCards;
             } else if (handValue === bestHandValue) {
                 // ✅ Handle tie cases by comparing kicker
