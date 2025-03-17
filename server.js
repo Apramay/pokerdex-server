@@ -363,7 +363,7 @@ function showdown() {
      winners.forEach(({ player, bestCards }) => {
         broadcast({
             type: "updateActionHistory",
-            action: `🏆 Winner: ${player.name} - Best Hand: ${displayHand(bestCards)}`
+            action: `🏆 Winner: ${winner.name} - Best Hand: ${displayHand(bestCards)}`
         });
     });
 
