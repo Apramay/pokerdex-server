@@ -348,11 +348,10 @@ function showdown() {
     });
 
     // ✅ Automatically reveal the winner's hand
-     let revealedHands = winners.map(({ player, bestCards }) => ({
-        playerName: player.name,
-        bestHand: bestCards  // ✅ FIX: Ensure bestHand is included
+    let revealedHands = winners.map(winner => ({
+        playerName: winner.name,
+        hand: winner.hand
     }));
-    
 
     // ✅ Broadcast revealed winner hands to all players
     broadcast({
@@ -361,13 +360,10 @@ function showdown() {
     });
 
     // ✅ Record winning hand in history
-     winners.forEach(({ player, bestCards }) => {
-        broadcast({
-            type: "updateActionHistory",
-            action: `🏆 Winner: ${winners.map(w => w.player.name).join(", ")} - Best Hand: ${formatHand(bestCards)}`
-        });
+    broadcast({
+        type: "updateActionHistory",
+        action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${formatHand(winners[0].hand)}`
     });
-
 
     distributePot();
 
@@ -471,7 +467,7 @@ function determineWinners(playerList) {
 
             if (handValue > bestHandValue) {
                 bestHandValue = handValue;
-                winners = [{ player, bestCards }];
+                winners = [player];
                 bestHandDetails = bestCards;
             } else if (handValue === bestHandValue) {
                 // ✅ Handle tie cases by comparing kicker
