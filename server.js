@@ -348,10 +348,10 @@ function showdown() {
     });
 
     // ✅ Automatically reveal the winner's hand
-    let revealedHands = winners.map(({ player, bestCards }) => ({
-    playerName: player.name,
-    hand: bestCards // ✅ Now correctly referencing best 5-card hand
-}));
+    let revealedHands = winners.map(winner => ({
+        playerName: winner.name,
+        hand: winner.hand
+    }));
 
     // ✅ Broadcast revealed winner hands to all players
     broadcast({
@@ -467,7 +467,7 @@ function determineWinners(playerList) {
 
             if (handValue > bestHandValue) {
                 bestHandValue = handValue;
-                winners = [{ player, bestCards }];
+                winners = [player];
                 bestHandDetails = bestCards;
             } else if (handValue === bestHandValue) {
                 // ✅ Handle tie cases by comparing kicker
