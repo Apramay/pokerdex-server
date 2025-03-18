@@ -401,24 +401,36 @@ function resetGame() {
     startNewHand();
 }
 
-
 function determineWinners(playerList) {
-    if (playerList.length === 0) {
-        return [];
-    }
+    if (playerList.length === 0) return [];
 
     let bestHandValue = -1;
     let winners = [];
+    let bestHand = null;
 
     playerList.forEach(player => {
         if (player.status !== "folded") {
-            const handValue = evaluateHand(player.hand.concat(tableCards));
+            const fullHand = player.hand.concat(tableCards);
+            const { value, sortedHand } = evaluateHand(fullHand);
 
-            if (handValue > bestHandValue) {
-                bestHandValue = handValue;
+            if (value > bestHandValue) {
+                bestHandValue = value;
                 winners = [player];
-            } else if (handValue === bestHandValue) {
-                winners.push(player);
+                bestHand = sortedHand;
+            } else if (value === bestHandValue) {
+                // Compare high cards if hands are the same type
+                for (let i = 0; i < sortedHand.length; i++) {
+                    if (rankValues[sortedHand[i].rank] > rankValues[bestHand[i].rank]) {
+                        winners = [player];
+                        bestHand = sortedHand;
+                        break;
+                    } else if (rankValues[sortedHand[i].rank] < rankValues[bestHand[i].rank]) {
+                        break;
+                    }
+                }
+                if (JSON.stringify(sortedHand) === JSON.stringify(bestHand)) {
+                    winners.push(player);
+                }
             }
         }
     });
@@ -426,23 +438,26 @@ function determineWinners(playerList) {
     return winners;
 }
 
+
 // Function to evaluate the hand of a player
 function evaluateHand(cards) {
-    const hand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
-    const ranks = hand.map(card => card.rank);
-    const suits = hand.map(card => card.suit);
+    const sortedHand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
+    const ranks = sortedHand.map(card => card.rank);
+    const suits = sortedHand.map(card => card.suit);
 
-    if (isRoyalFlush(hand, ranks, suits)) return 10;
-    if (isStraightFlush(hand, ranks, suits)) return 9;
-    if (isFourOfAKind(hand, ranks)) return 8;
-    if (isFullHouse(hand, ranks)) return 7;
-    if (isFlush(hand, suits)) return 6;
-    if (isStraight(hand, ranks)) return 5;
-    if (isThreeOfAKind(hand, ranks)) return 4;
-    if (isTwoPair(hand, ranks)) return 3;
-    if (isOnePair(hand, ranks)) return 2;
-    return 1; // High card
+    if (isRoyalFlush(sortedHand, ranks, suits)) return { value: 10, sortedHand };
+    if (isStraightFlush(sortedHand, ranks, suits)) return { value: 9, sortedHand };
+    if (isFourOfAKind(sortedHand, ranks)) return { value: 8, sortedHand };
+    if (isFullHouse(sortedHand, ranks)) return { value: 7, sortedHand };
+    if (isFlush(sortedHand, suits)) return { value: 6, sortedHand };
+    if (isStraight(sortedHand, ranks)) return { value: 5, sortedHand };
+    if (isThreeOfAKind(sortedHand, ranks)) return { value: 4, sortedHand };
+    if (isTwoPair(sortedHand, ranks)) return { value: 3, sortedHand };
+    if (isOnePair(sortedHand, ranks)) return { value: 2, sortedHand };
+    
+    return { value: 1, sortedHand }; // High card
 }
+
 
 // Helper functions to check for different hand types
 function isRoyalFlush(hand, ranks, suits) {
@@ -481,18 +496,20 @@ function isFullHouse(hand, ranks) {
 function isFlush(hand, suits) {
     return suits.every(suit => suit === suits[0]);
 }
-
 function isStraight(hand, ranks) {
-    const rankValues = hand.map(card => {
-        if (card.rank === "A") return 14;
-        if (card.rank === "K") return 13;
-        if (card.rank === "Q") return 12;
-        if (card.rank === "J") return 11;
-        return parseInt(card.rank);
-    }).sort((a, b) => a - b);
+    let rankValuesSorted = hand.map(card => rankValues[card.rank]).sort((a, b) => a - b);
 
-    if (rankValues[4] - rankValues[0] === 4) return true;
-    if (rankValues[3] - rankValues[0] === 3 && rankValues[4] === 14 && rankValues[3] === 5) return true; // Special case for A,2,3,4,5
+    // Normal straight check
+    for (let i = 0; i <= rankValuesSorted.length - 5; i++) {
+        if (rankValuesSorted[i + 4] - rankValuesSorted[i] === 4) return true;
+    }
+
+    // Special case for Ace-low straight (A,2,3,4,5)
+    if (rankValuesSorted.includes(14) && 
+        rankValuesSorted.slice(0, 4).join(",") === "2,3,4,5") {
+        return true;
+    }
+
     return false;
 }
 
