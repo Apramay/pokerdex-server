@@ -73,6 +73,7 @@ function broadcastGameState() {
     });
 }
 
+
 // Function to start the game
 function startGame() {
     if (players.length < 2) {
@@ -152,6 +153,9 @@ function setupBlinds() {
     setTimeout(bettingRound, 500); // ✅ Start the first betting round
 }
 
+function formatHand(hand) {
+    return hand.map(card => `${card.rank} of ${card.suit}`).join(", ");
+}
 
 
 function postBlind(player, amount, isBigBlind = false) {
@@ -333,39 +337,50 @@ function nextRound() {
     broadcastGameState();
     setTimeout(() => startFlopBetting(), 1500);
 }
+
 function showdown() {
-    console.log("Showdown!");
+    console.log("🏆 Showdown!");
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
     let winners = determineWinners(activePlayers);
 
-    let winnerDetails = winners.map(winner => {
-        let fullHand = winner.hand.concat(tableCards);
-        let handResult = evaluateHand(fullHand); // Get best hand details
-
-        if (!handResult || !handResult.sortedHand) {
-            console.error(`❌ Error evaluating hand for ${winner.name}`);
-            return { name: winner.name, bestHand: "Error Evaluating Hand" };
-        }
-
-        let best5Cards = handResult.sortedHand.map(card => `${card.rank} of ${card.suit}`).join(", ");
-        return { name: winner.name, bestHand: best5Cards };
+    winners.forEach(winner => {
+        console.log(`🎉 ${winner.name} wins the hand!`);
     });
 
-    winners.forEach(winner => {
-        console.log(`${winner.name} wins with ${winnerDetails.find(w => w.name === winner.name).bestHand}`);
+    // ✅ Automatically reveal the winner's hand
+    let revealedHands = winners.map(winner => ({
+        playerName: winner.name,
+        hand: winner.hand
+    }));
+
+    // ✅ Broadcast revealed winner hands to all players
+    broadcast({
+        type: "showdown",
+        winners: revealedHands,
+    });
+
+    // ✅ Record winning hand in history
+    broadcast({
+        type: "updateActionHistory",
+        action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${formatHand(winners[0].hand)}`
     });
 
     distributePot();
-    broadcastGameState();
-    broadcast({
-        type: "winner",
-        winners: winnerDetails.map(w => ({ name: w.name, bestHand: w.bestHand })),
-        pot: pot
-    });
-    
-    setTimeout(resetGame, 3000);
-}
 
+    // ✅ Give players the option to "Show" or "Hide" their hands
+  let remainingPlayers = activePlayers.filter(p => !winners.includes(p)).map(p => p.name);
+    
+    if (remainingPlayers.length > 0) {
+        // ✅ Wait for them to choose before starting the next round
+        broadcast({
+            type: "showOrHideCards",
+            remainingPlayers
+        });
+    } else {
+        // ✅ If no one needs to choose, start the next hand immediately
+        setTimeout(resetGame, 5000);
+    }
+}
 
 function distributePot() {
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
@@ -465,19 +480,18 @@ function evaluateHand(cards) {
     const ranks = sortedHand.map(card => card.rank);
     const suits = sortedHand.map(card => card.suit);
 
-    if (isRoyalFlush(sortedHand, ranks, suits)) return { value: 10, sortedHand: sortedHand.slice(0, 5) };
-    if (isStraightFlush(sortedHand, ranks, suits)) return { value: 9, sortedHand: sortedHand.slice(0, 5) };
-    if (isFourOfAKind(sortedHand, ranks)) return { value: 8, sortedHand: sortedHand.slice(0, 5) };
-    if (isFullHouse(sortedHand, ranks)) return { value: 7, sortedHand: sortedHand.slice(0, 5) };
-    if (isFlush(sortedHand, suits)) return { value: 6, sortedHand: sortedHand.slice(0, 5) };
-    if (isStraight(sortedHand, ranks)) return { value: 5, sortedHand: sortedHand.slice(0, 5) };
-    if (isThreeOfAKind(sortedHand, ranks)) return { value: 4, sortedHand: sortedHand.slice(0, 5) };
-    if (isTwoPair(sortedHand, ranks)) return { value: 3, sortedHand: sortedHand.slice(0, 5) };
-    if (isOnePair(sortedHand, ranks)) return { value: 2, sortedHand: sortedHand.slice(0, 5) };
-    
-    return { value: 1, sortedHand: sortedHand.slice(0, 5) }; // High card
-}
+    if (isRoyalFlush(sortedHand, ranks, suits)) return { handValue: 10, bestCards: sortedHand };
+    if (isStraightFlush(sortedHand, ranks, suits)) return { handValue: 9, bestCards: sortedHand };
+    if (isFourOfAKind(sortedHand, ranks)) return { handValue: 8, bestCards: sortedHand };
+    if (isFullHouse(sortedHand, ranks)) return { handValue: 7, bestCards: sortedHand };
+    if (isFlush(sortedHand, suits)) return { handValue: 6, bestCards: sortedHand };
+    if (isStraight(sortedHand, ranks)) return { handValue: 5, bestCards: sortedHand };
+    if (isThreeOfAKind(sortedHand, ranks)) return { handValue: 4, bestCards: sortedHand };
+    if (isTwoPair(sortedHand, ranks)) return { handValue: 3, bestCards: sortedHand };
+    if (isOnePair(sortedHand, ranks)) return { handValue: 2, bestCards: sortedHand };
 
+    return { handValue: 1, bestCards: sortedHand.slice(0, 5) }; // High card
+}
 
 
 // Helper functions to check for different hand types
@@ -577,7 +591,6 @@ function compareHands(handA, handB) {
     return 0; // Exact tie
 }
 
-
 // WebSocket server event handling
 wss.on('connection', function connection(ws) {
     console.log('✅ A new client connected');
@@ -588,12 +601,41 @@ wss.on('connection', function connection(ws) {
         try {
             const data = JSON.parse(message);
 
+            // ✅ Handle "Show or Hide" Decision
+            if (data.type === "showHideDecision") {
+            let player = players.find(p => p.name === data.playerName);
+            if (!player) return;
+
+            if (data.choice === "show") {
+                console.log(`👀 ${player.name} chose to SHOW their hand!`);
+                broadcast({
+                    type: "updateActionHistory",
+                    action: `👀 ${player.name} revealed: ${formatHand(player.hand)}`
+                });
+            } else {
+                console.log(`🙈 ${player.name} chose to HIDE their hand.`);
+                broadcast({
+                    type: "updateActionHistory",
+                    action: `🙈 ${player.name} chose to keep their hand hidden.`
+                });
+            }
+
+            // ✅ Remove player from the waiting list
+            playersWhoNeedToDecide = playersWhoNeedToDecide.filter(p => p !== data.playerName);
+
+            // ✅ If all players have chosen, start the next round
+            if (playersWhoNeedToDecide.length === 0) {
+                setTimeout(resetGame, 3000);
+            }
+        }
+
+            // ✅ Handle other game actions separately
             if (data.type === 'join') {
                 const player = {
                     name: data.name,
                     ws: ws,
                     tokens: 1000,
-                    hand:[],
+                    hand: [],
                     currentBet: 0,
                     status: 'active',
                     allIn: false
@@ -601,6 +643,7 @@ wss.on('connection', function connection(ws) {
                 players.push(player);
                 console.log(`➕ Player ${data.name} joined. Total players: ${players.length}`);
                 broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
+
             } else if (data.type === 'startGame') {
                 startGame();
             } else if (data.type === 'bet') {
@@ -626,6 +669,7 @@ wss.on('connection', function connection(ws) {
         broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
     });
 });
+
 
 // Action handlers
 function handleRaise(data) {
