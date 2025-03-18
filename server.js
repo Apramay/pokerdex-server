@@ -73,7 +73,6 @@ function broadcastGameState() {
     });
 }
 
-
 // Function to start the game
 function startGame() {
     if (players.length < 2) {
@@ -153,9 +152,6 @@ function setupBlinds() {
     setTimeout(bettingRound, 500); // ✅ Start the first betting round
 }
 
-function formatHand(hand) {
-    return hand.map(card => `${card.rank} of ${card.suit}`).join(", ");
-}
 
 
 function postBlind(player, amount, isBigBlind = false) {
@@ -339,58 +335,19 @@ function nextRound() {
 }
 
 function showdown() {
-    console.log("🏆 Showdown!");
+    console.log("Showdown!");
     let activePlayers = players.filter(p => p.status === "active" || p.allIn);
     let winners = determineWinners(activePlayers);
-
     winners.forEach(winner => {
-        console.log(`🎉 ${winner.name} wins the hand!`);
-    });
-
-    // ✅ Automatically reveal the winner's hand
-    let revealedHands = winners.map(winner => ({
-        playerName: winner.name,
-        hand: winner.hand
-    }));
-
-    // ✅ Broadcast revealed winner hands to all players
-    broadcast({
-        type: "showdown",
-        winners: revealedHands,
-    });
-
-    // ✅ Record winning hand in history
-    broadcast({
-        type: "updateActionHistory",
-        action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${formatHand(winners[0].hand)}`
-    });
-
+        console.log(`${winner.name} wins the hand!`);});
     distributePot();
-
-    // ✅ Give players the option to "Show" or "Hide" their hands
-  let remainingPlayers = activePlayers.filter(p => !winners.includes(p)).map(p => p.name);
-    
-   if (remainingPlayers.length > 0) {
-        broadcast({
-            type: "showOrHideCards",
-            remainingPlayers
-        });
-
-        // ⏳ Auto-hide after 10 seconds if no action is taken
-        setTimeout(() => {
-            remainingPlayers.forEach(playerName => {
-                console.log(`⏳ ${playerName} took too long! Auto-hiding cards.`);
-                broadcast({
-                    type: "updateActionHistory",
-                    action: `⏳ ${playerName} did not act in time. Cards hidden automatically.`
-                });
-            });
-
-            setTimeout(resetGame, 3000); // ✅ Start new hand after auto-hiding
-        }, 10000);
-    } else {
-        setTimeout(resetGame, 5000);
-    }
+    broadcastGameState();
+    broadcast({
+        type: "winner",
+        winners: winners.map(w => w.name),
+        pot: pot
+    });
+    setTimeout(resetGame, 3000);
 }
 
 function distributePot() {
@@ -434,22 +391,16 @@ function resetGame() {
     round = 0;
     tableCards = [];
     pot = 0;
-
-    // ✅ Move the dealer button to the next active player
-    dealerIndex = (dealerIndex + 1) % players.length;
-
-    // ✅ Reset all players for a new round
     players.forEach(player => {
         player.hand = [];
         player.currentBet = 0;
         player.status = "active";
         player.allIn = false;
     });
-
-    console.log(`🎲 New dealer is: ${players[dealerIndex].name}`);
-
-    startNewHand(); // ✅ Start the new round with correct dealer
+    dealerIndex = (dealerIndex + 1) % players.length; // Move dealer button
+    startNewHand();
 }
+
 
 function determineWinners(playerList) {
     if (playerList.length === 0) {
@@ -458,25 +409,16 @@ function determineWinners(playerList) {
 
     let bestHandValue = -1;
     let winners = [];
-    let bestHandDetails = null; // To store best hand details for tiebreakers
 
     playerList.forEach(player => {
         if (player.status !== "folded") {
-            const fullHand = player.hand.concat(tableCards);
-            const { handValue, bestCards } = evaluateHand(fullHand);
+            const handValue = evaluateHand(player.hand.concat(tableCards));
 
             if (handValue > bestHandValue) {
                 bestHandValue = handValue;
                 winners = [player];
-                bestHandDetails = bestCards;
             } else if (handValue === bestHandValue) {
-                // ✅ Handle tie cases by comparing kicker
-                if (compareHands(bestCards, bestHandDetails) > 0) {
-                    winners = [player]; // New best kicker
-                    bestHandDetails = bestCards;
-                } else if (compareHands(bestCards, bestHandDetails) === 0) {
-                    winners.push(player); // Exact tie, add both winners
-                }
+                winners.push(player);
             }
         }
     });
@@ -484,26 +426,23 @@ function determineWinners(playerList) {
     return winners;
 }
 
-
 // Function to evaluate the hand of a player
 function evaluateHand(cards) {
-    const sortedHand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
-    const ranks = sortedHand.map(card => card.rank);
-    const suits = sortedHand.map(card => card.suit);
+    const hand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
+    const ranks = hand.map(card => card.rank);
+    const suits = hand.map(card => card.suit);
 
-    if (isRoyalFlush(sortedHand, ranks, suits)) return { handValue: 10, bestCards: sortedHand };
-    if (isStraightFlush(sortedHand, ranks, suits)) return { handValue: 9, bestCards: sortedHand };
-    if (isFourOfAKind(sortedHand, ranks)) return { handValue: 8, bestCards: sortedHand };
-    if (isFullHouse(sortedHand, ranks)) return { handValue: 7, bestCards: sortedHand };
-    if (isFlush(sortedHand, suits)) return { handValue: 6, bestCards: sortedHand };
-    if (isStraight(sortedHand, ranks)) return { handValue: 5, bestCards: sortedHand };
-    if (isThreeOfAKind(sortedHand, ranks)) return { handValue: 4, bestCards: sortedHand };
-    if (isTwoPair(sortedHand, ranks)) return { handValue: 3, bestCards: sortedHand };
-    if (isOnePair(sortedHand, ranks)) return { handValue: 2, bestCards: sortedHand };
-
-    return { handValue: 1, bestCards: sortedHand.slice(0, 5) }; // High card
+    if (isRoyalFlush(hand, ranks, suits)) return 10;
+    if (isStraightFlush(hand, ranks, suits)) return 9;
+    if (isFourOfAKind(hand, ranks)) return 8;
+    if (isFullHouse(hand, ranks)) return 7;
+    if (isFlush(hand, suits)) return 6;
+    if (isStraight(hand, ranks)) return 5;
+    if (isThreeOfAKind(hand, ranks)) return 4;
+    if (isTwoPair(hand, ranks)) return 3;
+    if (isOnePair(hand, ranks)) return 2;
+    return 1; // High card
 }
-
 
 // Helper functions to check for different hand types
 function isRoyalFlush(hand, ranks, suits) {
@@ -544,25 +483,18 @@ function isFlush(hand, suits) {
 }
 
 function isStraight(hand, ranks) {
-    const handValues = hand.map(card => rankValues[card.rank]) // ✅ Renamed to avoid conflict
-        .sort((a, b) => a - b);
+    const rankValues = hand.map(card => {
+        if (card.rank === "A") return 14;
+        if (card.rank === "K") return 13;
+        if (card.rank === "Q") return 12;
+        if (card.rank === "J") return 11;
+        return parseInt(card.rank);
+    }).sort((a, b) => a - b);
 
-    // Normal straight check
-    for (let i = 0; i <= handValues.length - 5; i++) {
-        if (handValues[i + 4] - handValues[i] === 4 &&
-            new Set(handValues.slice(i, i + 5)).size === 5) {
-            return true;
-        }
-    }
-
-    // Special case: A, 2, 3, 4, 5 (Low Straight)
-    if (handValues.includes(14) && handValues.slice(0, 4).join() === "2,3,4,5") {
-        return true;
-    }
-
+    if (rankValues[4] - rankValues[0] === 4) return true;
+    if (rankValues[3] - rankValues[0] === 3 && rankValues[4] === 14 && rankValues[3] === 5) return true; // Special case for A,2,3,4,5
     return false;
 }
-
 
 function isThreeOfAKind(hand, ranks) {
     for (let rank of ranks) {
@@ -594,13 +526,6 @@ function isOnePair(hand, ranks) {
     }
     return false;
 }
-function compareHands(handA, handB) {
-    for (let i = 0; i < Math.min(handA.length, handB.length); i++) {
-        if (rankValues[handA[i].rank] > rankValues[handB[i].rank]) return 1;
-        if (rankValues[handA[i].rank] < rankValues[handB[i].rank]) return -1;
-    }
-    return 0; // Exact tie
-}
 
 // WebSocket server event handling
 wss.on('connection', function connection(ws) {
@@ -612,41 +537,12 @@ wss.on('connection', function connection(ws) {
         try {
             const data = JSON.parse(message);
 
-            // ✅ Handle "Show or Hide" Decision
-            if (data.type === "showHideDecision") {
-            let player = players.find(p => p.name === data.playerName);
-            if (!player) return;
-
-            if (data.choice === "show") {
-                console.log(`👀 ${player.name} chose to SHOW their hand!`);
-                broadcast({
-                    type: "updateActionHistory",
-                    action: `👀 ${player.name} revealed: ${formatHand(player.hand)}`
-                });
-            } else {
-                console.log(`🙈 ${player.name} chose to HIDE their hand.`);
-                broadcast({
-                    type: "updateActionHistory",
-                    action: `🙈 ${player.name} chose to keep their hand hidden.`
-                });
-            }
-
-            // ✅ Remove player from the waiting list
-            playersWhoNeedToDecide = playersWhoNeedToDecide.filter(p => p !== data.playerName);
-
-            // ✅ If all players have chosen, start the next round
-            if (playersWhoNeedToDecide.length === 0) {
-                setTimeout(resetGame, 3000);
-            }
-        }
-
-            // ✅ Handle other game actions separately
             if (data.type === 'join') {
                 const player = {
                     name: data.name,
                     ws: ws,
                     tokens: 1000,
-                    hand: [],
+                    hand:[],
                     currentBet: 0,
                     status: 'active',
                     allIn: false
@@ -654,7 +550,6 @@ wss.on('connection', function connection(ws) {
                 players.push(player);
                 console.log(`➕ Player ${data.name} joined. Total players: ${players.length}`);
                 broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
-
             } else if (data.type === 'startGame') {
                 startGame();
             } else if (data.type === 'bet') {
@@ -680,7 +575,6 @@ wss.on('connection', function connection(ws) {
         broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
     });
 });
-
 
 // Action handlers
 function handleRaise(data) {
