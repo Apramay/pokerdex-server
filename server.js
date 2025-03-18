@@ -340,8 +340,14 @@ function showdown() {
 
     let winnerDetails = winners.map(winner => {
         let fullHand = winner.hand.concat(tableCards);
-        let { sortedHand } = evaluateHand(fullHand); // Get best 5 cards
-        let best5Cards = sortedHand.slice(0, 5).map(card => `${card.rank} of ${card.suit}`).join(", ");
+        let handResult = evaluateHand(fullHand); // Get best hand details
+
+        if (!handResult || !handResult.sortedHand) {
+            console.error(`❌ Error evaluating hand for ${winner.name}`);
+            return { name: winner.name, bestHand: "Error Evaluating Hand" };
+        }
+
+        let best5Cards = handResult.sortedHand.map(card => `${card.rank} of ${card.suit}`).join(", ");
         return { name: winner.name, bestHand: best5Cards };
     });
 
@@ -459,18 +465,19 @@ function evaluateHand(cards) {
     const ranks = sortedHand.map(card => card.rank);
     const suits = sortedHand.map(card => card.suit);
 
-    if (isRoyalFlush(sortedHand, ranks, suits)) return { handValue: 10, bestCards: sortedHand };
-    if (isStraightFlush(sortedHand, ranks, suits)) return { handValue: 9, bestCards: sortedHand };
-    if (isFourOfAKind(sortedHand, ranks)) return { handValue: 8, bestCards: sortedHand };
-    if (isFullHouse(sortedHand, ranks)) return { handValue: 7, bestCards: sortedHand };
-    if (isFlush(sortedHand, suits)) return { handValue: 6, bestCards: sortedHand };
-    if (isStraight(sortedHand, ranks)) return { handValue: 5, bestCards: sortedHand };
-    if (isThreeOfAKind(sortedHand, ranks)) return { handValue: 4, bestCards: sortedHand };
-    if (isTwoPair(sortedHand, ranks)) return { handValue: 3, bestCards: sortedHand };
-    if (isOnePair(sortedHand, ranks)) return { handValue: 2, bestCards: sortedHand };
-
-    return { handValue: 1, bestCards: sortedHand.slice(0, 5) }; // High card
+    if (isRoyalFlush(sortedHand, ranks, suits)) return { value: 10, sortedHand: sortedHand.slice(0, 5) };
+    if (isStraightFlush(sortedHand, ranks, suits)) return { value: 9, sortedHand: sortedHand.slice(0, 5) };
+    if (isFourOfAKind(sortedHand, ranks)) return { value: 8, sortedHand: sortedHand.slice(0, 5) };
+    if (isFullHouse(sortedHand, ranks)) return { value: 7, sortedHand: sortedHand.slice(0, 5) };
+    if (isFlush(sortedHand, suits)) return { value: 6, sortedHand: sortedHand.slice(0, 5) };
+    if (isStraight(sortedHand, ranks)) return { value: 5, sortedHand: sortedHand.slice(0, 5) };
+    if (isThreeOfAKind(sortedHand, ranks)) return { value: 4, sortedHand: sortedHand.slice(0, 5) };
+    if (isTwoPair(sortedHand, ranks)) return { value: 3, sortedHand: sortedHand.slice(0, 5) };
+    if (isOnePair(sortedHand, ranks)) return { value: 2, sortedHand: sortedHand.slice(0, 5) };
+    
+    return { value: 1, sortedHand: sortedHand.slice(0, 5) }; // High card
 }
+
 
 
 // Helper functions to check for different hand types
