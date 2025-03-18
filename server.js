@@ -348,10 +348,15 @@ function showdown() {
     });
 
     // ✅ Automatically reveal the winner's hand
-    let revealedHands = winners.map(winner => ({
-        playerName: winner.name,
-        hand: winner.hand
-    }));
+    let revealedHands = winners.map(winner => {
+        const fullHand = winner.hand.concat(tableCards);
+        const { bestCards } = evaluateHand(fullHand); // Extract the best 5-card hand
+
+        return {
+            playerName: winner.name,
+            hand: bestCards  // ✅ Showing only the best 5 cards
+        };
+    });
 
     // ✅ Broadcast revealed winner hands to all players
     broadcast({
@@ -362,7 +367,7 @@ function showdown() {
     // ✅ Record winning hand in history
     broadcast({
         type: "updateActionHistory",
-        action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${formatHand(winners[0].hand)}`
+        action: `🏆 Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${formatHand(revealedHands[0].hand)}`
     });
 
     distributePot();
