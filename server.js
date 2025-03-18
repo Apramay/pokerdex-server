@@ -348,10 +348,10 @@ function showdown() {
     });
 
     // ✅ Automatically reveal the winner's hand
-    let revealedHands = winners.map(winner => ({
-        playerName: winner.name,
-        hand: bestCards
-    }));
+    let revealedHands = winners.map(({ player, bestCards }) => ({
+    playerName: player.name,
+    hand: bestCards // ✅ Now correctly referencing best 5-card hand
+}));
 
     // ✅ Broadcast revealed winner hands to all players
     broadcast({
