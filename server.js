@@ -373,16 +373,22 @@ function showdown() {
     distributePot();
 
     // ✅ Give players the option to "Show" or "Hide" their hands
-  let remainingPlayers = activePlayers.filter(p => !winners.includes(p)).map(p => p.name);
-    
+ let remainingPlayers = activePlayers.filter(p => !winners.includes(p)).map(p => p.name);
+
     if (remainingPlayers.length > 0) {
-        // ✅ Wait for them to choose before starting the next round
         broadcast({
             type: "showOrHideCards",
             remainingPlayers
         });
+
+        // ✅ Auto-start next hand if no action in 10 seconds
+        setTimeout(() => {
+            if (remainingPlayers.length > 0) {
+                console.log("⏳ No player responded. Automatically starting the next hand...");
+                resetGame();
+            }
+        }, 10000); // 10 seconds
     } else {
-        // ✅ If no one needs to choose, start the next hand immediately
         setTimeout(resetGame, 5000);
     }
 }
