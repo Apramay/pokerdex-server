@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ server, host: '0.0.0.0' });
 
 // Card and game constants
 const suits = ["Hearts", "Diamonds", "Clubs", "Spades"];
@@ -832,6 +832,8 @@ function handleCheck(data) {
 
 
 // Start the server
-server.listen(process.env.PORT || 8080, () => {
-    console.log(`WebSocket server started on port ${server.address().port}`);
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+    console.log(`WebSocket server started on port ${PORT}`);
+
 });
