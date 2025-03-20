@@ -590,7 +590,7 @@ wss.on('connection', function connection(ws) {
                     }, ws.tableId);
                 }
                 //  ✅  Remove player from the waiting list
-                let playersWhoNeedToDecide =;
+                let playersWhoNeedToDecide = [];
                 if (ws.tableId) {
                     let table = tables.get(ws.tableId);
                     if (table) {
