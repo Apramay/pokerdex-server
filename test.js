@@ -688,7 +688,7 @@ if (player.tokens === 0) {
 player.allIn = true;
 }
 table.playersWhoActed.add(player.name);
-console.log(💰 ${player.name} raised to ${raiseAmount}. Pot: ${table.pot}, Current Bet: ${table.currentBet});
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
 broadcast({
 type: "updateActionHistory",
 action: ${data.playerName} raised to ${raiseAmount}
@@ -727,7 +727,7 @@ if (betAmount <= player.tokens && betAmount > table.currentBet) {
         player.allIn = true;
     }
     table.playersWhoActed.add(player.name);
-    console.log(` 💰  ${player.name} bet ${betAmount}. Pot: ${table.pot}, Current Bet: ${table.currentBet}`);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
     broadcast({
         type: "updateActionHistory",
         action: `${data.playerName} bet ${betAmount}`
@@ -766,7 +766,7 @@ if (callAmount <= player.tokens) {
     }
     player.status = "active";
     table.playersWhoActed.add(player.name);
-    console.log(` 💰  ${player.name} called. Pot: ${table.pot}, Current Bet: ${table.currentBet}`);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
     broadcast({
         type: "updateActionHistory",
         action: `${data.playerName} called`
