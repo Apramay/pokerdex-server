@@ -414,7 +414,7 @@ function resetGame(tableId) {
     table.dealerIndex = (table.dealerIndex + 1) % table.players.length;
     //  ✅  Reset all players for a new round
     table.players.forEach(player => {
-        player.hand []= ;
+        player.hand = [] ;
         player.currentBet = 0;
         player.status = "active";
         player.allIn = false;
