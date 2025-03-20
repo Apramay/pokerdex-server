@@ -253,7 +253,7 @@ function bigBlindCheckRaiseOption(tableId) {
 }
 // Function to deal a hand of cards to a player
 function dealHand(deck, numCards) {
-    const hand =;
+    const hand = [];
     for (let i = 0; i < numCards; i++) {
         hand.push(deck.pop());
     } [cite: 58, 59, 60, 61]
