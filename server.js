@@ -8,14 +8,6 @@ app.use(cors());
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-const { v4: uuidv4 } = require("uuid"); // Add at the top of the file
-
-app.post("/createTable", (req, res) => {
-    let tableId = uuidv4().slice(0, 6); // Generate a unique 6-character table ID
-    tables[tableId] = { players: [], gameState: {}, deck: createDeck(), pot: 0, currentBet: 0 };
-    console.log(`🎲 New Table Created: ${tableId}`);
-    res.json({ tableId });
-});
 
 // Card and game constants
 const suits = ["Hearts", "Diamonds", "Clubs", "Spades"];
@@ -25,8 +17,7 @@ const rankValues = {
 };
 
 // Game state variables
-let tables = {}; // Stores all active tables
-
+let players = [];
 let tableCards = [];
 let pot = 0;
 let currentPlayerIndex = 0;
@@ -60,30 +51,27 @@ function broadcast(data) {
 }
 
 // Function to broadcast the current game state to all clients
-function broadcastGameState(tableId) {
-    if (!tables[tableId]) return;
-    
-    tables[tableId].players.forEach(player => {
-        const gameState = {
+function broadcastGameState() {
+    players.forEach(player => {
+        const privateGameState = {
             type: "updateGameState",
-            players: tables[tableId].players.map(({ ws, hand, ...playerData }) => ({
+            players: players.map(({ ws, hand, ...playerData }) => ({
                 ...playerData, 
                 hand: player.name === playerData.name ? hand : Array(hand.length).fill({ rank: "back", suit: "back" })
             })),
-            tableCards: tables[tableId].tableCards,
-            pot: tables[tableId].pot,
-            currentBet: tables[tableId].currentBet,
-            round: tables[tableId].round,
-            currentPlayerIndex: tables[tableId].currentPlayerIndex,
-            dealerIndex: tables[tableId].dealerIndex
+            tableCards,
+            pot,
+            currentBet,
+            round,
+            currentPlayerIndex,
+            dealerIndex
         };
 
         if (player.ws.readyState === WebSocket.OPEN) {
-            player.ws.send(JSON.stringify(gameState));
+            player.ws.send(JSON.stringify(privateGameState));
         }
     });
 }
-
 
 
 // Function to start the game
@@ -653,35 +641,22 @@ wss.on('connection', function connection(ws) {
         }
 
             // ✅ Handle other game actions separately
-            if (data.type === "joinTable") {
-                const { tableId, name } = data;
-
-                if (!tables[tableId]) {
-                    ws.send(JSON.stringify({ type: "error", message: "Table not found" }));
-                    return;
-                }
-
+            if (data.type === 'join') {
                 const player = {
-                    name,
-                    ws,
+                    name: data.name,
+                    ws: ws,
                     tokens: 1000,
                     hand: [],
                     currentBet: 0,
-                    status: "active",
+                    status: 'active',
                     allIn: false
                 };
-
-                tables[tableId].players.push(player);
-                console.log(`➕ ${name} joined Table ${tableId}`);
-
-                broadcast(tableId, {
-                    type: "updatePlayers",
-                    players: tables[tableId].players.map(({ ws, ...player }) => player)
-                });
-
+                players.push(player);
+                console.log(`➕ Player ${data.name} joined. Total players: ${players.length}`);
+                broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
 
             } else if (data.type === 'startGame') {
-                startGame(data.tableId);
+                startGame();
             } else if (data.type === 'bet') {
                 handleBet(data);
             } else if (data.type === 'raise') {
@@ -701,13 +676,8 @@ wss.on('connection', function connection(ws) {
 
     ws.on('close', () => {
         console.log('❌ Client disconnected');
-        Object.keys(tables).forEach(tableId => {
-            tables[tableId].players = tables[tableId].players.filter(player => player.ws !== ws);
-            broadcast(tableId, {
-                type: "updatePlayers",
-                players: tables[tableId].players.map(({ ws, ...player }) => player)
-                  });
-        });
+        players = players.filter(player => player.ws !== ws);
+        broadcast({ type: 'updatePlayers', players: players.map(({ ws, ...player }) => player) });
     });
 });
 
@@ -715,112 +685,150 @@ wss.on('connection', function connection(ws) {
 // Action handlers
 function handleRaise(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
-    const { tableId, playerName, amount } = data;
-    if (!tables[tableId]) return;
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
 
-    const player = tables[tableId].players.find(p => p.name === playerName);
-    if (!player) return;
+    const raiseAmount = parseInt(data.amount);
 
-    const raiseAmount = parseInt(amount);
-    if (raiseAmount <= tables[tableId].currentBet || raiseAmount > player.tokens) {
-        console.error("Invalid raise amount:", playerName);
+    if (raiseAmount <= currentBet || raiseAmount > player.tokens) {
+        console.error("Invalid raise amount:", data.playerName);
         return;
     }
 
     const totalBet = raiseAmount;
     player.tokens -= totalBet - player.currentBet;
-    tables[tableId].pot += totalBet - player.currentBet;
+    pot += totalBet - player.currentBet;
     player.currentBet = totalBet;
-    tables[tableId].currentBet = totalBet;
+    currentBet = totalBet;
 
-    tables[tableId].playersWhoActed.add(player.name);
+    // ✅ Mark this player as having acted
+    playersWhoActed.add(player.name);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
 
-    tables[tableId].currentPlayerIndex = getNextPlayerIndex(tableId, tables[tableId].currentPlayerIndex);
 
-    broadcast(tableId, {
+    // Move to the next player
+    currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+broadcast({
         type: "updateActionHistory",
-        action: `${playerName} raised ${raiseAmount}`
+        action: `${data.playerName} raised ${raiseAmount}`
     });
-
-    broadcastGameState(tableId);
+    // Broadcast the updated game state
+    broadcastGameState();
 }
 
 function handleCall(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+    console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
-    const { tableId, playerName } = data;
-    if (!tables[tableId]) return;
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
 
-    const player = tables[tableId].players.find(p => p.name === playerName);
-    if (!player) return;
-
-    let amount = Math.min(tables[tableId].currentBet - player.currentBet, player.tokens);
+    let amount = Math.min(currentBet - player.currentBet, player.tokens);
     player.tokens -= amount;
     player.currentBet += amount;
-    tables[tableId].pot += amount;
-
+    pot += amount;
     if (player.tokens === 0) {
         player.allIn = true;
     }
 
-    tables[tableId].playersWhoActed.add(player.name);
+    // ✅ Add player to "acted" set
+    playersWhoActed.add(player.name);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
+    broadcast({
+        type: "updateActionHistory",
+        action: `${data.playerName} called`
+    });
 
-    if (isBettingRoundOver(tableId)) {
-        setTimeout(() => nextRound(tableId), 1000);
+    // ✅ Check if ALL players have acted before moving forward
+    if (isBettingRoundOver()) {
+        console.log("✅ All players have called/checked. Moving to next round.");
+        setTimeout(nextRound, 1000);
     } else {
-        tables[tableId].currentPlayerIndex = getNextPlayerIndex(tableId, tables[tableId].currentPlayerIndex);
-        broadcastGameState(tableId);
+        // ✅ Instead of skipping players, ensure next active player gets a turn
+        const nextIndex = getNextPlayerIndex(currentPlayerIndex);
+        if (nextIndex !== -1) {
+            currentPlayerIndex = nextIndex;
+            console.log(`🎯 Next player is ${players[currentPlayerIndex].name}`);
+            broadcastGameState();
+        } else {
+            console.log("⚠️ No valid next player found. Ending round.");
+            setTimeout(nextRound, 1000);
+        }
     }
 }
-
 function handleFold(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+    console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
-    const { tableId, playerName } = data;
-    if (!tables[tableId]) return;
-
-    const player = tables[tableId].players.find(p => p.name === playerName);
-    if (!player) return;
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
 
     player.status = "folded";
-    tables[tableId].playersWhoActed.add(player.name);
 
-    tables[tableId].currentPlayerIndex = getNextPlayerIndex(tableId, tables[tableId].currentPlayerIndex);
+    // ✅ Mark this player as having acted
+    playersWhoActed.add(player.name);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
+     broadcast({
+        type: "updateActionHistory",
+        action: `${data.playerName} folded`
+    });
 
-    if (isBettingRoundOver(tableId)) {
-        setTimeout(() => nextRound(tableId), 1000);
+    // ✅ Move to the next player only once
+    const nextIndex = getNextPlayerIndex(currentPlayerIndex);
+    if (nextIndex !== -1) {
+        currentPlayerIndex = nextIndex;
+    }
+
+    if (isBettingRoundOver()) {
+        console.log("✅ All players have acted. Moving to next round.");
+        setTimeout(nextRound, 1000);
     } else {
-        broadcastGameState(tableId);
+        broadcastGameState();  // ✅ Only update the UI once
     }
 }
-
 
 
 function handleCheck(data) {
     console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+    console.log("Before updating playersWhoActed:", [...playersWhoActed]);
 
-    const { tableId, playerName } = data;
-    if (!tables[tableId]) return;
+    const player = players.find(p => p.name === data.playerName);
+    if (!player) {
+        console.error("❌ Player not found:", data.playerName);
+        return; // ✅ Prevents processing an invalid action
+    }
 
-    const player = tables[tableId].players.find(p => p.name === playerName);
-    if (!player) return;
-
-    if (tables[tableId].currentBet === 0 || player.currentBet === tables[tableId].currentBet) {
+    if (currentBet === 0 || player.currentBet === currentBet) {
         console.log(`${player.name} checked.`);
-        tables[tableId].playersWhoActed.add(player.name);
+        playersWhoActed.add(player.name);
+        console.log("After updating playersWhoActed:", [...playersWhoActed]);
+         broadcast({
+            type: "updateActionHistory",
+            action: `${data.playerName} checked`
+        });
 
-        if (isBettingRoundOver(tableId)) {
-            setTimeout(() => nextRound(tableId), 1000);
+
+        if (isBettingRoundOver()) {
+            setTimeout(nextRound, 1000);
         } else {
             setTimeout(() => {
-                tables[tableId].currentPlayerIndex = getNextPlayerIndex(tableId, tables[tableId].currentPlayerIndex);
-                broadcastGameState(tableId);
+                currentPlayerIndex = getNextPlayerIndex(currentPlayerIndex);
+                broadcastGameState();
             }, 500);
         }
     }
 }
-
 
 
 // Start the server
