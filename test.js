@@ -691,7 +691,7 @@ table.playersWhoActed.add(player.name);
     console.log("After updating playersWhoActed:", [...playersWhoActed]);
 broadcast({
 type: "updateActionHistory",
-action: ${data.playerName} raised to ${raiseAmount}
+action: `${data.playerName} raised ${raiseAmount}`
 }, tableId);
 broadcast({ type: "raise", playerName: data.playerName, amount: raiseAmount }, tableId);
 //  ✅  After a raise, all need to act again
