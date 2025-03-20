@@ -840,5 +840,5 @@ if (table.currentBet === 0 || player.currentBet === table.currentBet) {
 }
 // Start the server
 server.listen(process.env.PORT || 8080, () => {
-console.log(WebSocket server started on port ${server.address().port});
+console.log(`WebSocket server started on port ${server.address().port}`;
 });
