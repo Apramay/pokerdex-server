@@ -619,8 +619,8 @@ wss.on('connection', function connection(ws) {
                 let table = tables.get(tableId);
                 if (!table) {
                     table = {
-                        players:,
-                        tableCards:,
+                        players: [],
+                        tableCards: [],
                         pot: 0,
                         currentPlayerIndex: 0,
                         deckForGame:,
