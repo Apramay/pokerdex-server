@@ -594,7 +594,6 @@ wss.on('connection', function connection(ws) {
                 if (ws.tableId) {
                     let table = tables.get(ws.tableId);
                     if (table) {
-                        playersWhoNeedToDecide = table.playersWhoNeedToDecide ||;
                         playersWhoNeedToDecide = playersWhoNeedToDecide.filter(p => p !== data.playerName);
                         table.playersWhoNeedToDecide = playersWhoNeedToDecide;
                     }
