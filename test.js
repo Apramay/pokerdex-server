@@ -623,7 +623,7 @@ wss.on('connection', function connection(ws) {
                         tableCards: [],
                         pot: 0,
                         currentPlayerIndex: 0,
-                        deckForGame:,
+                        deckForGame: [],
                         currentBet: 0,
                         dealerIndex: 0,
                         round: 0,
