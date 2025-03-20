@@ -11,11 +11,11 @@ const wss = new WebSocket.Server({ server });
 const tables = new Map();
 
 // Card and game constants
-const suits = ["Hearts", "Diamonds", "Clubs", "Spades"]; [cite: 3, 4]
-const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]; [cite: 3, 4]
+const suits = ["Hearts", "Diamonds", "Clubs", "Spades"];
+const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]; 
 const rankValues = {
     "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K": 13, "A": 14
-}; [cite: 5]
+}; 
 // Game state variables
 // let players = [];
 // let tableCards = [];
@@ -35,8 +35,8 @@ function createDeck() {
         ranks.forEach(rank => {
             deck.push({ suit, rank });
         });
-    }); [cite: 8, 9, 10]
-    return deck.sort(() => Math.random() - 0.5); [cite: 10]
+    }); 
+    return deck.sort(() => Math.random() - 0.5); 
 }
 // Function to broadcast data to all connected clients
 function broadcast(data, tableId) {
@@ -45,7 +45,7 @@ function broadcast(data, tableId) {
         if (client.tableId === tableId && client.readyState === WebSocket.OPEN) {
             client.send(jsonData);
         }
-    }); [cite: 11]
+    });
 }
 // Function to broadcast the current game state to all clients
 function broadcastGameState(tableId) {
@@ -71,27 +71,27 @@ function broadcastGameState(tableId) {
         if (player.ws.readyState === WebSocket.OPEN) {
             player.ws.send(JSON.stringify(privateGameState));
         }
-    }); [cite: 12, 13, 14]
+    }); 
 }
 // Function to start the game
 function startGame(tableId) {
     const table = tables.get(tableId);
     if (!table || table.players.length < 2) {
-        console.log(" ❌  Not enough players to start the game."); [cite: 15, 16]
+        console.log(" ❌  Not enough players to start the game.");
         return;
     }
     table.deckForGame = shuffleDeck(createDeck());
     table.dealerIndex = Math.floor(Math.random() * table.players.length);
     startNewHand(tableId);
     broadcast({ type: "startGame" }, tableId);
-    broadcastGameState(tableId); [cite: 16]
+    broadcastGameState(tableId); 
 }
 // Function to start a new hand
 function startNewHand(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
     // Reset game state for a new hand
-    table.tableCards = []; [cite: 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+    table.tableCards = []; 
     table.pot = 0;
     table.currentBet = 0;
     table.playersWhoActed.clear();
@@ -125,7 +125,7 @@ function setupBlinds(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
-    table.pot = 0; [cite: 24, 25, 26, 27, 28, 29, 30, 31]
+    table.pot = 0; 
     const smallBlindIndex = (table.dealerIndex + 1) % table.players.length;
     const bigBlindIndex = (table.dealerIndex + 2) % table.players.length;
     console.log(` 🎲  Setting up blinds: SB -> ${table.players[smallBlindIndex].name}, BB -> ${table.players[bigBlindIndex].name}`);
@@ -146,7 +146,7 @@ function setupBlinds(tableId) {
     setTimeout(bettingRound, 500, tableId); //  ✅  Start the first betting round
 }
 function formatHand(hand) {
-    return hand.map(card => `${card.rank} of ${card.suit}`).join(", "); [cite: 31, 32, 33, 34, 35]
+    return hand.map(card => `${card.rank} of ${card.suit}`).join(", "); 
 }
 function postBlind(player, amount, tableId, isBigBlind = false) {
     const table = tables.get(tableId);
@@ -168,7 +168,7 @@ function getNextPlayerIndex(currentIndex, tableId) {
     const table = tables.get(tableId);
     if (!table) return -1;
 
-    console.log(` 🔄  Finding next player from index ${currentIndex}`); [cite: 36, 37, 38, 39, 40, 41, 42]
+    console.log(` 🔄  Finding next player from index ${currentIndex}`); 
     let nextIndex = (currentIndex + 1) % table.players.length;
     let attempts = 0;
     while (attempts < table.players.length) {
@@ -189,7 +189,7 @@ function bettingRound(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
-    console.log("Starting betting round..."); [cite: 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61]
+    console.log("Starting betting round..."); 
     let activePlayers = table.players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
     if (activePlayers.length <= 1) {
         console.log("Betting round over, moving to next round.");
@@ -256,7 +256,7 @@ function dealHand(deck, numCards) {
     const hand = [];
     for (let i = 0; i < numCards; i++) {
         hand.push(deck.pop());
-    } [cite: 58, 59, 60, 61]
+    } 
     return hand;
 }
 // Function to shuffle the deck of cards
@@ -271,7 +271,7 @@ function startFlopBetting(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
-    table.currentBet = 0; [cite: 61, 62, 63, 64]
+    table.currentBet = 0; 
     table.playersWhoActed.clear();
     //  ✅  Get the first active player left of the dealer
     table.currentPlayerIndex = getNextPlayerIndex(table.dealerIndex, tableId);
@@ -293,7 +293,7 @@ function nextRound(tableId) {
     table.playersWhoActed.clear();
     console.log(" 🆕  New round started. Reset playersWhoActed."); //  ✅  Debugging log
     if (table.round === 0) {
-        table.round++; [cite: 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74]
+        table.round++; 
         table.tableCards = dealHand(table.deckForGame, 3); // Flop
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(table.tableCards)}` }, tableId);
     } else if (table.round === 1) {
