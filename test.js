@@ -16,7 +16,16 @@ const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 const rankValues = {
     "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K": 13, "A": 14
 }; 
-
+ let players = [];
+ let tableCards = [];
+let pot = 0;
+let currentPlayerIndex = 0;
+let deckForGame = [];
+let currentBet = 0;
+let dealerIndex = 0;
+let round = 0;
+let smallBlindAmount = 10;
+let bigBlindAmount = 20;
 let playersWhoActed = new Set();
 // Function to create a new deck of cards
 function createDeck() {
@@ -56,7 +65,6 @@ function broadcastGameState(tableId) {
             round: table.round,
             currentPlayerIndex: table.currentPlayerIndex,
             dealerIndex: table.dealerIndex
-
         };
 
         if (player.ws.readyState === WebSocket.OPEN) {
@@ -626,11 +634,7 @@ wss.on('connection', function connection(ws) {
                 }
                 table.players.push(player);
                 console.log(` ➕  Player ${data.name} joined. Total players: ${table.players.length}`);
-                broadcast({ 
-    type: "updatePlayers", 
-    players: table.players.map(({ ws, ...player }) => player),
-    tableId: tableId  // ✅ Include tableId
-}, tableId);
+                broadcast({ type: 'updatePlayers', players: table.players.map(({ ws, ...player }) => player) }, tableId);
             } else if (data.type === 'startGame') {
                 startGame(data.tableId);
             } else if (data.type === 'bet') {
