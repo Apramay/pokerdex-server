@@ -626,7 +626,11 @@ wss.on('connection', function connection(ws) {
                 }
                 table.players.push(player);
                 console.log(` ➕  Player ${data.name} joined. Total players: ${table.players.length}`);
-                broadcast({ type: 'updatePlayers', players: table.players.map(({ ws, ...player }) => player) }, tableId);
+                broadcast({ 
+    type: "updatePlayers", 
+    players: table.players.map(({ ws, ...player }) => player),
+    tableId: tableId  // ✅ Include tableId
+}, tableId);
             } else if (data.type === 'startGame') {
                 startGame(data.tableId);
             } else if (data.type === 'bet') {
