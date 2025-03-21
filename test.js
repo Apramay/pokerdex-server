@@ -56,7 +56,6 @@ function broadcastGameState(tableId) {
             round: table.round,
             currentPlayerIndex: table.currentPlayerIndex,
             dealerIndex: table.dealerIndex
-                        tableId: tableId // ✅ Ensure table ID is included
 
         };
 
