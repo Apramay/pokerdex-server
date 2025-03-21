@@ -16,16 +16,8 @@ const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]
 const rankValues = {
     "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K": 13, "A": 14
 }; 
- let players = [];
- let tableCards = [];
-let pot = 0;
-let currentPlayerIndex = 0;
-let deckForGame = [];
-let currentBet = 0;
-let dealerIndex = 0;
-let round = 0;
-let smallBlindAmount = 10;
-let bigBlindAmount = 20;
+ const tables = new Map(); // Store game state for each table
+
 let playersWhoActed = new Set();
 // Function to create a new deck of cards
 function createDeck() {
@@ -65,6 +57,8 @@ function broadcastGameState(tableId) {
             round: table.round,
             currentPlayerIndex: table.currentPlayerIndex,
             dealerIndex: table.dealerIndex
+                        tableId: tableId // ✅ Ensure table ID is included
+
         };
 
         if (player.ws.readyState === WebSocket.OPEN) {
