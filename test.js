@@ -277,7 +277,8 @@ function startFlopBetting(tableId) {
 
     // ✅ Set the first active player left of the dealer
     const smallBlindIndex = (table.dealerIndex + 1) % table.players.length;
-    const nextIndex = getNextPlayerIndex(smallBlindIndex - 1, tableId);
+    const startIndex = (smallBlindIndex - 1 + table.players.length) % table.players.length;
+    const nextIndex = getNextPlayerIndex(startIndex, tableId);
     if (nextIndex !== -1) {
         table.currentPlayerIndex = nextIndex;
         console.log(` 🎯  Starting post-flop betting with: ${table.players[nextIndex].name}`);
