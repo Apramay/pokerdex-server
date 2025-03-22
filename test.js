@@ -209,7 +209,7 @@ function bettingRound(tableId) {
         return;
     }
     console.log(`Waiting for player ${player.name} to act...`);
-    broadcast({ type: "playerTurn", playerName: player.name }, tableId);
+    broadcast({ type: "playerTurn", playerName: player.name, tableId: tableId }, tableId);
 }
 function isBettingRoundOver(tableId) {
     const table = tables.get(tableId);
@@ -304,20 +304,20 @@ function nextRound(tableId) {
         table.round++; 
         table.tableCards = dealHand(table.deckForGame, 3); // Flop
         console.log("🃏 Flop dealt:", table.tableCards);
-        broadcast({ type: "message", text: `Flop: ${JSON.stringify(table.tableCards)}` }, tableId);
+        broadcast({ type: "message", text: `Flop: ${JSON.stringify(table.tableCards)}`, tableId: tableId }, tableId);
     } else if (table.round === 1) {
         table.round++;
         if (table.deckForGame.length > 0) {
             table.tableCards.push(dealHand(table.deckForGame, 1)[0]);
             // Turn
-            broadcast({ type: "message", text: `Turn: ${JSON.stringify(table.tableCards[3])}` }, tableId)
+            broadcast({ type: "message", text: `Turn: ${JSON.stringify(table.tableCards[3])}` , tableId: tableId }, tableId)
         }
     } else if (table.round === 2) {
         table.round++;
         if (table.deckForGame.length > 0) {
             table.tableCards.push(dealHand(table.deckForGame, 1)[0]);
             // Turn
-            broadcast({ type: "message", text: `River: ${JSON.stringify(table.tableCards[4])}` }, tableId);
+            broadcast({ type: "message", text: `River: ${JSON.stringify(table.tableCards[4])}` ,tableId: tableId }, tableId);
         }
     } else if (table.round === 3) {
         showdown(tableId);
@@ -644,7 +644,7 @@ wss.on('connection', function connection(ws) {
                 }
                 table.players.push(player);
                 console.log(` ➕  Player ${data.name} joined. Total players: ${table.players.length}`);
-                broadcast({ type: 'updatePlayers', players: table.players.map(({ ws, ...player }) => player) }, tableId);
+                broadcast({ type: 'updatePlayers', players: table.players.map(({ ws, ...player }) => player) , tableId: tableId }, tableId);
             } else if (data.type === 'startGame') {
                 startGame(data.tableId);
             } else if (data.type === 'bet') {
@@ -702,7 +702,7 @@ broadcast({
 type: "updateActionHistory",
 action: `${data.playerName} raised ${raiseAmount}`
 }, tableId);
-broadcast({ type: "raise", playerName: data.playerName, amount: raiseAmount }, tableId);
+broadcast({ type: "raise", playerName: data.playerName, amount: raiseAmount , tableId: tableId }, tableId);
 //  ✅  After a raise, all need to act again
 table.players.forEach(p => {
 if (p.name !== player.name) {
@@ -741,7 +741,8 @@ if (betAmount <= player.tokens && betAmount > table.currentBet) {
         type: "updateActionHistory",
         action: `${data.playerName} bet ${betAmount}`
     }, tableId);
-    broadcast({ type: "bet", playerName: data.playerName, amount: betAmount }, tableId);
+    broadcast({ type: "bet", playerName: data.playerName, amount: betAmount, tableId: tableId
+ }, tableId);
     //  ✅  After a bet, all need to act again
     table.players.forEach(p => {
         if (p.name !== player.name) {
@@ -780,7 +781,7 @@ if (callAmount <= player.tokens) {
         type: "updateActionHistory",
         action: `${data.playerName} called`
     }, tableId);
-    broadcast({ type: "call", playerName: data.playerName }, tableId);
+    broadcast({ type: "call", playerName: data.playerName, tableId: tableId }, tableId);
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
     if (table.currentPlayerIndex !== -1) {
         bettingRound(tableId);
@@ -809,7 +810,7 @@ broadcast({
     type: "updateActionHistory",
     action: `${data.playerName} folded`
 }, tableId);
-broadcast({ type: "fold", playerName: data.playerName }, tableId);
+broadcast({ type: "fold", playerName: data.playerName , tableId: tableId }, tableId);
 table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
 if (table.currentPlayerIndex !== -1) {
     bettingRound(tableId);
