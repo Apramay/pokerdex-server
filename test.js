@@ -54,6 +54,7 @@ function broadcastGameState(tableId) {
     table.players.forEach(player => {
         const privateGameState = {
             type: "updateGameState",
+            tableId: tableId, 
             players: table.players.map(({ ws, hand, ...playerData }) => ({
                 ...playerData,
                 hand: player.name === playerData.name ? hand
