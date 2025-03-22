@@ -291,6 +291,10 @@ function nextRound(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
     console.log("nextRound() called. Current round:", table.round);
+    console.log("💬 Deck size:", table.deckForGame?.length);
+    console.log("💬 Pot:", table.pot);
+    console.log("💬 TableCards before dealing:", table.tableCards);
+
     table.currentBet = 0;
     table.players.forEach(player => (player.currentBet = 0));
     table.playersWhoActed.clear();
@@ -298,6 +302,7 @@ function nextRound(tableId) {
     if (table.round === 0) {
         table.round++; 
         table.tableCards = dealHand(table.deckForGame, 3); // Flop
+        console.log("🃏 Flop dealt:", table.tableCards);
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(table.tableCards)}` }, tableId);
     } else if (table.round === 1) {
         table.round++;
