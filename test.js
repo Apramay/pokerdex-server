@@ -286,7 +286,7 @@ function startFlopBetting(tableId) {
         console.warn(`⚠️ No valid player to start betting with at table ${tableId}`);
     }
 }
-}
+
 function nextRound(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
