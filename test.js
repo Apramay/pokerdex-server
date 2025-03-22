@@ -272,16 +272,20 @@ function startFlopBetting(tableId) {
 
     table.currentBet = 0; 
     table.playersWhoActed.clear();
-    //  ✅  Get the first active player left of the dealer
-    table.currentPlayerIndex = getNextPlayerIndex(table.dealerIndex, tableId);
-    console.log(` 🎯  Starting post-flop betting with: ${table.players[table.currentPlayerIndex].name}`);
-    table.playersWhoActed.clear();
-    //  ✅  Broadcast correct first player
-    broadcast({
-        type: "playerTurn",
-        playerName: table.players[table.currentPlayerIndex].name
-    }, tableId);
-    bettingRound(tableId);
+
+    // ✅ Set the first active player left of the dealer
+    const nextIndex = getNextPlayerIndex(table.dealerIndex, tableId);
+    if (nextIndex !== -1) {
+        table.currentPlayerIndex = nextIndex;
+        console.log(` 🎯  Starting post-flop betting with: ${table.players[nextIndex].name}`);
+        broadcast({
+            type: "playerTurn",
+            playerName: table.players[nextIndex].name
+        }, tableId);
+    } else {
+        console.warn(`⚠️ No valid player to start betting with at table ${tableId}`);
+    }
+}
 }
 function nextRound(tableId) {
     const table = tables.get(tableId);
