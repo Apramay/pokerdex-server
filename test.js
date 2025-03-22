@@ -169,7 +169,7 @@ function getNextPlayerIndex(currentIndex, tableId) {
     if (!table) return -1;
 
     console.log(` 🔄  Finding next player from index ${currentIndex}`); 
-    let nextIndex = (currentIndex + 1) % table.players.length;
+    let nextIndex = includeCurrent ? currentIndex : (currentIndex + 1) % table.players.length;
     let attempts = 0;
     while (attempts < table.players.length) {
         let nextPlayer = table.players[nextIndex];
@@ -277,8 +277,7 @@ function startFlopBetting(tableId) {
 
     // ✅ Set the first active player left of the dealer
     const smallBlindIndex = (table.dealerIndex + 1) % table.players.length;
-    const startIndex = (smallBlindIndex - 1 + table.players.length) % table.players.length;
-    const nextIndex = getNextPlayerIndex(startIndex, tableId);
+    const nextIndex = getNextPlayerIndex(smallBlindIndex, tableId, true);
     if (nextIndex !== -1) {
         table.currentPlayerIndex = nextIndex;
         console.log(` 🎯  Starting post-flop betting with: ${table.players[nextIndex].name}`);
