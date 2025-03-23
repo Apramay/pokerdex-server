@@ -169,7 +169,7 @@ function getNextPlayerIndex(currentIndex, tableId) {
     if (!table) return -1;
 
     console.log(` 🔄  Finding next player from index ${currentIndex}`); 
-    let nextIndex = includeCurrent ? currentIndex : (currentIndex + 1) % table.players.length;
+    let nextIndex = (currentIndex + 1) % table.players.length;
     let attempts = 0;
     while (attempts < table.players.length) {
         let nextPlayer = table.players[nextIndex];
@@ -204,8 +204,7 @@ function bettingRound(tableId) {
     const player = table.players[table.currentPlayerIndex];
     if (table.playersWhoActed.has(player.name) && player.currentBet === table.currentBet) {
         console.log(`${player.name} has already acted. Skipping...`);
-        const raiserIndex = table.players.findIndex(p => p.name === data.playerName);
-    table.currentPlayerIndex = getNextPlayerIndex(raiserIndex, tableId);
+        table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
         bettingRound(tableId);
         return;
     }
@@ -276,8 +275,7 @@ function startFlopBetting(tableId) {
     table.playersWhoActed.clear();
 
     // ✅ Set the first active player left of the dealer
-    const smallBlindIndex = (table.dealerIndex + 1) % table.players.length;
-    const nextIndex = getNextPlayerIndex(smallBlindIndex, tableId, true);
+    const nextIndex = getNextPlayerIndex(table.dealerIndex, tableId);
     if (nextIndex !== -1) {
         table.currentPlayerIndex = nextIndex;
         console.log(` 🎯  Starting post-flop betting with: ${table.players[nextIndex].name}`);
@@ -680,44 +678,27 @@ wss.on('connection', function connection(ws) {
 function handleRaise(data, tableId) {
     const table = tables.get(tableId);
     if (!table) return;
-
-    console.log(` 🔄  ${data.playerName} performed action: ${data.type}`);
-    console.log("Before updating playersWhoActed:", [...table.playersWhoActed]);
+    
     const player = table.players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
-        return;
-    }
+    if (!player) return;
+    
     const raiseAmount = parseInt(data.amount);
-    if (raiseAmount <= player.tokens && raiseAmount > table.currentBet) {
-let actualRaiseAmount = raiseAmount - player.currentBet;
-player.tokens -= actualRaiseAmount;
-table.pot += actualRaiseAmount;
-table.currentBet = raiseAmount;
-player.currentBet = raiseAmount;
-if (player.tokens === 0) {
-player.allIn = true;
+    if (raiseAmount > player.tokens || raiseAmount <= table.currentBet) return;
+
+    const totalBet = raiseAmount;
+    player.tokens -= (totalBet - player.currentBet);
+    table.pot += (totalBet - player.currentBet);
+    player.currentBet = totalBet;
+    table.currentBet = totalBet;
+
+    table.playersWhoActed.clear(); // ✅ Reset all players except raiser
+    table.playersWhoActed.add(player.name);
+
+    table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
+    broadcastGameState(tableId);
+    bettingRound(tableId);
 }
-table.playersWhoActed.add(player.name);
-    console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
-broadcast({
-type: "updateActionHistory",
-action: `${data.playerName} raised ${raiseAmount}`
-}, tableId);
-broadcast({ type: "raise", playerName: data.playerName, amount: raiseAmount , tableId: tableId }, tableId);
-//  ✅  After a raise, all need to act again
-table.players.forEach(p => {
-if (p.name !== player.name) {
-table.playersWhoActed.delete(p.name);
-}
-});
-console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
-const raiserIndex = table.players.findIndex(p => p.name === data.playerName);
-    table.currentPlayerIndex = getNextPlayerIndex(raiserIndex, tableId);
-broadcastGameState(tableId);  //  ✅  Only update the UI once
-bettingRound(tableId);
-}
-}
+
 function handleBet(data, tableId) {
 const table = tables.get(tableId);
 if (!table) return;
@@ -739,7 +720,7 @@ if (betAmount <= player.tokens && betAmount > table.currentBet) {
         player.allIn = true;
     }
     table.playersWhoActed.add(player.name);
-    console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
     broadcast({
         type: "updateActionHistory",
         action: `${data.playerName} bet ${betAmount}`
@@ -747,10 +728,13 @@ if (betAmount <= player.tokens && betAmount > table.currentBet) {
     broadcast({ type: "bet", playerName: data.playerName, amount: betAmount, tableId: tableId
  }, tableId);
     //  ✅  After a bet, all need to act again
-    table.playersWhoActed = new Set([player.name]);
+    table.players.forEach(p => {
+        if (p.name !== player.name) {
+            table.playersWhoActed.delete(p.name);
+        }
+    });
     console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
-    const raiserIndex = table.players.findIndex(p => p.name === data.playerName);
-    table.currentPlayerIndex = getNextPlayerIndex(raiserIndex, tableId);
+    table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
     broadcastGameState(tableId);  //  ✅  Only update the UI once
     bettingRound(tableId);
 }
@@ -776,14 +760,13 @@ if (callAmount <= player.tokens) {
     }
     player.status = "active";
     table.playersWhoActed.add(player.name);
-    console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
+    console.log("After updating playersWhoActed:", [...playersWhoActed]);
     broadcast({
         type: "updateActionHistory",
         action: `${data.playerName} called`
     }, tableId);
     broadcast({ type: "call", playerName: data.playerName, tableId: tableId }, tableId);
-    const raiserIndex = table.players.findIndex(p => p.name === data.playerName);
-    table.currentPlayerIndex = getNextPlayerIndex(raiserIndex, tableId);
+    table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
     if (table.currentPlayerIndex !== -1) {
         bettingRound(tableId);
     } else {
@@ -812,8 +795,7 @@ broadcast({
     action: `${data.playerName} folded`
 }, tableId);
 broadcast({ type: "fold", playerName: data.playerName , tableId: tableId }, tableId);
-const raiserIndex = table.players.findIndex(p => p.name === data.playerName);
-    table.currentPlayerIndex = getNextPlayerIndex(raiserIndex, tableId);
+table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
 if (table.currentPlayerIndex !== -1) {
     bettingRound(tableId);
 } else {
@@ -844,8 +826,7 @@ if (table.currentBet === 0 || player.currentBet === table.currentBet) {
     if (isBettingRoundOver(tableId)) {
         setTimeout(nextRound, 1000, tableId);
     } else {
-        const raiserIndex = table.players.findIndex(p => p.name === data.playerName);
-    table.currentPlayerIndex = getNextPlayerIndex(raiserIndex, tableId);
+        table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
         broadcastGameState(tableId);
         bettingRound(tableId);
     }
