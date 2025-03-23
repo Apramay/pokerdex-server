@@ -669,7 +669,7 @@ wss.on('connection', function connection(ws) {
             let table = tables.get(tableId);
             if (table) {
                 table.players = table.players.filter(player => player.ws !== ws);
-                broadcast({ type: 'updatePlayers', players: table.players.map(({ ws, ...player }) => player) }, tableId);
+                broadcast({ type: 'updatePlayers', players: table.players.map(({ ws, ...player }) => player), tableId: tableId }, tableId);
             }
         }
     });
