@@ -337,13 +337,14 @@ function showdown(tableId) {
         console.log(` 🎉  ${winner.name} wins the hand!`);
     });
     //  ✅  Automatically reveal the winner's hand
-    let revealedHands = winners.map(winner => {
+        let revealedHands = winners.map(winner => {
         const fullHand = winner.hand.concat(table.tableCards);
-        const { bestCards } = evaluateHand(fullHand); // Extract the best 5-card hand
+        const evalResult = evaluateHand(fullHand); // ✅ Store the result first
+
         return {
             playerName: winner.name,
-            hand: bestCards  //  ✅  Showing only the best 5 cards
-
+            hand: evalResult.bestCards, // ✅ Extract best cards
+            handType: evalResult.handType // ✅ Extract handType properly
         };
     });
     //  ✅  Broadcast revealed winner hands to all players
@@ -354,7 +355,7 @@ function showdown(tableId) {
     //  ✅  Record winning hand in history
     broadcast({
         type: "updateActionHistory",
-        action: ` 🏆  Winner: ${winners.map(w => w.name).join(", ")} - Hand: ${formatHand(revealedHands[0].hand)}`
+        action: `🏆  Winner: ${winners.map(w => w.name).join(", ")} with ${revealedHands[0].handType}`
     }, tableId);
     distributePot(tableId);
     //  ✅  Give players the option to "Show" or "Hide" their hands
@@ -380,37 +381,51 @@ function distributePot(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
+    console.log("💰 Distributing the pot...");
+
     let activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
+
+    // Sort players by their all-in amounts (for side pots)
     activePlayers.sort((a, b) => a.currentBet - b.currentBet);
+
     let totalPot = table.pot;
     let sidePots = [];
+
     while (activePlayers.length > 0) {
         const minBet = activePlayers[0].currentBet;
         let potPortion = 0;
+
         activePlayers.forEach(player => {
             potPortion += Math.min(minBet, player.currentBet);
             player.currentBet -= Math.min(minBet, player.currentBet);
         });
+
         sidePots.push({ players: [...activePlayers], amount: potPortion });
         activePlayers = activePlayers.filter(p => p.currentBet > 0);
     }
+
     sidePots.forEach(sidePot => {
         let winners = determineWinners(sidePot.players, table);
         let splitPot = Math.floor(sidePot.amount / winners.length);
         winners.forEach(winner => {
             winner.tokens += splitPot;
+            console.log(`🏆 ${winner.name} wins ${splitPot} from a side pot.`);
         });
     });
+
     let remainingPot = totalPot - sidePots.reduce((acc, sp) => acc + sp.amount, 0);
     if (remainingPot > 0) {
         let mainWinners = determineWinners(table.players.filter(p => p.status === "active"), table);
         let splitPot = Math.floor(remainingPot / mainWinners.length);
         mainWinners.forEach(winner => {
             winner.tokens += splitPot;
-            console.log(`${winner.name} wins ${splitPot} from the main pot.`);
+            console.log(`🏆 ${winner.name} wins ${splitPot} from the main pot.`);
         });
     }
+
+    table.pot = 0; // Reset the pot after distribution
 }
+
 function resetGame(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
@@ -468,18 +483,19 @@ function evaluateHand(cards) {
     const sortedHand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
     const ranks = sortedHand.map(card => card.rank);
     const suits = sortedHand.map(card => card.suit);
-    if (isRoyalFlush(sortedHand, ranks, suits)) return { handValue: 10, bestCards: sortedHand };
-    if (isStraightFlush(sortedHand, ranks, suits)) return { handValue: 9, bestCards: sortedHand };
-    if (isFourOfAKind(sortedHand, ranks)) return { handValue: 8, bestCards: sortedHand };
-    if (isFullHouse(sortedHand, ranks)) return { handValue: 7, bestCards: sortedHand };
-    if (isFlush(sortedHand, suits)) return { handValue: 6, bestCards: sortedHand };
-    if (isStraight(sortedHand, ranks)) return { handValue: 5, bestCards: sortedHand };
-    if (isThreeOfAKind(sortedHand, ranks)) return { handValue: 4, bestCards: sortedHand };
-    if (isTwoPair(sortedHand, ranks)) return { handValue: 3, bestCards: sortedHand };
-    if (isOnePair(sortedHand, ranks)) return { handValue: 2, bestCards: sortedHand };
-    return { handValue: 1, bestCards: sortedHand.slice(0, 5) };
-    // High card
+
+    if (isRoyalFlush(sortedHand, ranks, suits)) return { handValue: 10, bestCards: sortedHand, handType: "Royal Flush" };
+    if (isStraightFlush(sortedHand, ranks, suits)) return { handValue: 9, bestCards: sortedHand, handType: "Straight Flush" };
+    if (isFourOfAKind(sortedHand, ranks)) return { handValue: 8, bestCards: sortedHand, handType: "Four of a Kind" };
+    if (isFullHouse(sortedHand, ranks)) return { handValue: 7, bestCards: sortedHand, handType: "Full House" };
+    if (isFlush(sortedHand, suits)) return { handValue: 6, bestCards: sortedHand, handType: "Flush" };
+    if (isStraight(sortedHand, ranks)) return { handValue: 5, bestCards: sortedHand, handType: "Straight" };
+    if (isThreeOfAKind(sortedHand, ranks)) return { handValue: 4, bestCards: sortedHand, handType: "Three of a Kind" };
+    if (isTwoPair(sortedHand, ranks).result) return { handValue: 3, bestCards: sortedHand, handType: "Two Pair" };
+    if (isOnePair(sortedHand, ranks)) return { handValue: 2, bestCards: sortedHand, handType: "One Pair" };
+    return { handValue: 1, bestCards: sortedHand.slice(0, 5), handType: "High Card" };
 }
+
 // Helper functions to check for different hand types
 function isRoyalFlush(hand, ranks, suits) {
     if (!isFlush(hand, suits)) return false;
@@ -538,17 +554,26 @@ function isThreeOfAKind(hand, ranks) {
     return false;
 }
 function isTwoPair(hand, ranks) {
-    let pairs = 0;
+    let pairs = [];
     let checkedRanks = new Set();
+    
     for (let rank of ranks) {
         if (checkedRanks.has(rank)) continue;
         if (ranks.filter(r => r === rank).length === 2) {
-            pairs++;
+            pairs.push(rankValues[rank]); // Store numerical value of the pair
             checkedRanks.add(rank);
         }
     }
-    return pairs === 2;
+
+    if (pairs.length === 2) {
+        pairs.sort((a, b) => b - a); // Sort pairs to ensure the highest pair is first
+        const kicker = ranks.find(rank => !pairs.includes(rankValues[rank])); // Find the kicker
+        return { result: true, highPair: pairs[0], lowPair: pairs[1], kicker: kicker ? rankValues[kicker] : 0 };
+    }
+
+    return { result: false, highPair: 0, lowPair: 0, kicker: 0 };
 }
+
 function isOnePair(hand, ranks) {
     for (let rank of ranks) {
         if (ranks.filter(r => r === rank).length === 2) {
