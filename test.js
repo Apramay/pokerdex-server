@@ -417,8 +417,25 @@ function distributePot(tableId) {
     activePlayers.sort((a, b) => a.currentBet - b.currentBet);
 
     let totalPot = table.pot;
-    let sidePots = table.sidePots || [];
+    let sidePots = [];
+    let remainingPot = totalPot;
+    let lastBet = 0;
 
+    // Create multiple side pots based on increasing all-in amounts
+    for (let i = 0; i < activePlayers.length; i++) {
+        let player = activePlayers[i];
+        let sidePotAmount = (player.currentBet - lastBet) * (activePlayers.length - i);
+        if (sidePotAmount > 0) {
+            sidePots.push({
+                amount: sidePotAmount,
+                eligiblePlayers: activePlayers.slice(i)
+            });
+            remainingPot -= sidePotAmount;
+        }
+        lastBet = player.currentBet;
+    }
+
+    // Award side pots
     sidePots.forEach(sidePot => {
         let winners = determineWinners(sidePot.eligiblePlayers, table);
         let splitPot = Math.floor(sidePot.amount / winners.length);
@@ -428,8 +445,9 @@ function distributePot(tableId) {
         });
     });
 
+    // Award main pot
     let mainWinners = determineWinners(activePlayers, table);
-    let splitPot = Math.floor(totalPot / mainWinners.length);
+    let splitPot = Math.floor(remainingPot / mainWinners.length);
     mainWinners.forEach(winner => {
         winner.tokens += splitPot;
         console.log(`🏆 ${winner.name} wins ${splitPot} from the main pot.`);
@@ -438,6 +456,7 @@ function distributePot(tableId) {
     table.pot = 0;
     table.sidePots = [];
 }
+
 
 function resetGame(tableId) {
     const table = tables.get(tableId);
