@@ -413,30 +413,14 @@ function distributePot(tableId) {
     if (!table) return;
 
     console.log("💰 Distributing the pot...");
-
     let activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
-
-    // Sort players by their all-in amounts (for side pots)
     activePlayers.sort((a, b) => a.currentBet - b.currentBet);
 
     let totalPot = table.pot;
-    let sidePots = [];
-
-    while (activePlayers.length > 0) {
-        const minBet = activePlayers[0].currentBet;
-        let potPortion = 0;
-
-        activePlayers.forEach(player => {
-            potPortion += Math.min(minBet, player.currentBet);
-            player.currentBet -= Math.min(minBet, player.currentBet);
-        });
-
-        sidePots.push({ players: [...activePlayers], amount: potPortion });
-        activePlayers = activePlayers.filter(p => p.currentBet > 0);
-    }
+    let sidePots = table.sidePots || [];
 
     sidePots.forEach(sidePot => {
-        let winners = determineWinners(sidePot.players, table);
+        let winners = determineWinners(sidePot.eligiblePlayers, table);
         let splitPot = Math.floor(sidePot.amount / winners.length);
         winners.forEach(winner => {
             winner.tokens += splitPot;
@@ -444,17 +428,15 @@ function distributePot(tableId) {
         });
     });
 
-    let remainingPot = totalPot - sidePots.reduce((acc, sp) => acc + sp.amount, 0);
-    if (remainingPot > 0) {
-        let mainWinners = determineWinners(table.players.filter(p => p.status === "active"), table);
-        let splitPot = Math.floor(remainingPot / mainWinners.length);
-        mainWinners.forEach(winner => {
-            winner.tokens += splitPot;
-            console.log(`🏆 ${winner.name} wins ${splitPot} from the main pot.`);
-        });
-    }
+    let mainWinners = determineWinners(activePlayers, table);
+    let splitPot = Math.floor(totalPot / mainWinners.length);
+    mainWinners.forEach(winner => {
+        winner.tokens += splitPot;
+        console.log(`🏆 ${winner.name} wins ${splitPot} from the main pot.`);
+    });
 
-    table.pot = 0; // Reset the pot after distribution
+    table.pot = 0;
+    table.sidePots = [];
 }
 
 function resetGame(tableId) {
@@ -750,29 +732,46 @@ function handleRaise(data, tableId) {
     const player = table.players.find(p => p.name === data.playerName);
     if (!player) return;
     
-    const raiseAmount = parseInt(data.amount);
-    if (raiseAmount > player.tokens || raiseAmount <= table.currentBet) return;
-
-    const totalBet = raiseAmount;
-    player.tokens -= (totalBet - player.currentBet);
-    table.pot += (totalBet - player.currentBet);
+    let raiseAmount = parseInt(data.amount);
+    if (raiseAmount > player.tokens) raiseAmount = player.tokens; // All-in scenario
+    
+    const totalBet = player.currentBet + raiseAmount;
+    player.tokens -= raiseAmount;
+    table.pot += raiseAmount;
     player.currentBet = totalBet;
+    
+    if (player.tokens === 0) {
+        player.allIn = true;
+    }
+    
+    console.log(`${player.name} raises to ${totalBet}`);
+    
+    // Handle side pot creation
+    const maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet));
+    table.sidePots = table.sidePots || [];
+    if (totalBet > maxEffectiveStack) {
+        console.log(`${player.name} raised beyond the effective stack, creating a side pot`);
+        table.sidePots.push({
+            amount: totalBet - maxEffectiveStack,
+            eligiblePlayers: table.players.filter(p => p.currentBet >= totalBet)
+        });
+    }
+    
     table.currentBet = totalBet;
-
-    table.playersWhoActed.clear(); // ✅ Reset all players except raiser
+    table.playersWhoActed.clear(); // Reset for new round
     table.playersWhoActed.add(player.name);
-     console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
+    
     broadcast({
         type: "updateActionHistory",
-        action: `${data.playerName} raise ${raiseAmount}`
+        action: `${data.playerName} raised to ${totalBet}`
     }, tableId);
-    broadcast({ type: "raise", playerName: data.playerName, amount: raiseAmount, tableId: tableId
- }, tableId);
-
+    broadcast({ type: "raise", playerName: data.playerName, amount: totalBet, tableId: tableId }, tableId);
+    
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
     broadcastGameState(tableId);
     bettingRound(tableId);
 }
+
 
 function handleBet(data, tableId) {
 const table = tables.get(tableId);
@@ -853,6 +852,22 @@ function handleCall(data, tableId) {
         player.currentBet = table.currentBet;
     }
 
+    // Handle re-shove scenario
+    const remainingPlayers = table.players.filter(p => p.tokens > 0 && !p.allIn);
+    if (remainingPlayers.length === 1) {
+        // If only one player left, excess chips must be refunded to over-betting player
+        const maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet));
+        table.players.forEach(p => {
+            if (p.currentBet > maxEffectiveStack) {
+                const excess = p.currentBet - maxEffectiveStack;
+                p.tokens += excess;
+                p.currentBet = maxEffectiveStack;
+                table.pot -= excess;
+                console.log(`${p.name} gets refunded ${excess} chips.`);
+            }
+        });
+    }
+
     table.playersWhoActed.add(player.name);
     console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
 
@@ -871,7 +886,6 @@ function handleCall(data, tableId) {
     }
     broadcastGameState(tableId);
 }
-
 function handleFold(data, tableId) {
 const table = tables.get(tableId);
 if (!table) return;
