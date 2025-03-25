@@ -195,42 +195,30 @@ function bettingRound(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
-    console.log("Starting betting round..."); 
-
-    // ✅ Include all-in players in the current round
+    console.log("🔄 Starting betting round...");
     let activePlayers = table.players.filter(p => p.status === "active");
-    let nonAllInPlayers = table.players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
+    let nonAllInPlayers = activePlayers.filter(p => !p.allIn && p.tokens > 0);
 
-    if (nonAllInPlayers.length === 0 && activePlayers.length > 1) {
-        console.log("⚠️ Only all-in players remain. Betting round continues without them acting.");
-    } else if (nonAllInPlayers.length === 0) {
-    console.log("✅ No players left with chips. Skipping to next round.");
-    setTimeout(nextRound, 1000, tableId);
-    return;
-} else if (
-    nonAllInPlayers.length === 1 &&
-    table.playersWhoActed.has(nonAllInPlayers[0].name) &&
-    nonAllInPlayers[0].currentBet === table.currentBet
-) {
-    console.log("✅ Only one non-all-in player and they’ve acted. Moving to next round.");
-    setTimeout(nextRound, 1000, tableId);
-    return;
-}
-    
-
-    if (isBettingRoundOver(tableId)) {
-        console.log("✅ All players have acted. Betting round is over.");
-        setTimeout(nextRound, 1000, tableId);
+    if (nonAllInPlayers.length === 0) {
+        console.log("✅ All remaining players are all-in. Moving to showdown.");
+        setTimeout(showdown, 1000, tableId);
         return;
     }
 
     const player = table.players[table.currentPlayerIndex];
-if (table.playersWhoActed.has(player.name)) {
-        console.log(`${player.name} has already acted. Skipping...`);
-    table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
-    bettingRound(tableId);
-    return;
+    if (!player || player.status === "folded" || player.allIn) {
+        table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
+        if (table.currentPlayerIndex === -1) {
+            console.log("✅ All betting actions complete. Moving to next round.");
+            setTimeout(nextRound, 1000, tableId);
+            return;
+        }
+    }
+
+    console.log(`Waiting for player ${player.name} to act...`);
+    broadcast({ type: "playerTurn", playerName: player.name, tableId: tableId }, tableId);
 }
+
     
 
     console.log(`Waiting for player ${player.name} to act...`);
