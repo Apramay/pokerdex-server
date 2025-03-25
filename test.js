@@ -219,12 +219,6 @@ function bettingRound(tableId) {
     broadcast({ type: "playerTurn", playerName: player.name, tableId: tableId }, tableId);
 }
 
-    
-
-    console.log(`Waiting for player ${player.name} to act...`);
-    broadcast({ type: "playerTurn", playerName: player.name, tableId: tableId }, tableId);
-}
-
 
 function isBettingRoundOver(tableId) {
     const table = tables.get(tableId);
