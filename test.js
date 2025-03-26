@@ -420,13 +420,14 @@ function distributePot(tableId) {
     let remainingPot = totalPot;
     let lastBet = 0;
 
-    // Create multiple side pots based on increasing all-in amounts
+    // ✅ Create side pots based on increasing all-in amounts
     for (let i = 0; i < activePlayers.length; i++) {
         let player = activePlayers[i];
         let sidePotAmount = (player.currentBet - lastBet) * (activePlayers.length - i);
+
         if (sidePotAmount > 0) {
             sidePots.push({
-                amount: sidePotAmount,
+                amount: Math.min(sidePotAmount, remainingPot),
                 eligiblePlayers: activePlayers.slice(i)
             });
             remainingPot -= sidePotAmount;
@@ -434,7 +435,7 @@ function distributePot(tableId) {
         lastBet = player.currentBet;
     }
 
-    // Award side pots
+    // ✅ Award each side pot to the best hand among eligible players
     sidePots.forEach(sidePot => {
         let winners = determineWinners(sidePot.eligiblePlayers, table);
         let splitPot = Math.floor(sidePot.amount / winners.length);
@@ -444,7 +445,7 @@ function distributePot(tableId) {
         });
     });
 
-    // Award main pot
+    // ✅ Award the main pot
     let mainWinners = determineWinners(activePlayers, table);
     let splitPot = Math.floor(remainingPot / mainWinners.length);
     mainWinners.forEach(winner => {
@@ -452,9 +453,21 @@ function distributePot(tableId) {
         console.log(`🏆 ${winner.name} wins ${splitPot} from the main pot.`);
     });
 
+    // ✅ Refund excess chips if necessary
+    let maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet));
+    table.players.forEach(player => {
+        if (player.currentBet > maxEffectiveStack) {
+            let refund = player.currentBet - maxEffectiveStack;
+            player.tokens += refund;
+            table.pot -= refund;
+            console.log(`💸 ${player.name} gets refunded ${refund} chips.`);
+        }
+    });
+
     table.pot = 0;
     table.sidePots = [];
 }
+
 
 
 function resetGame(tableId) {
@@ -761,28 +774,37 @@ function handleRaise(data, tableId) {
     if (player.tokens === 0) {
         player.allIn = true;
     }
-    
-    console.log(`${player.name} raises to ${totalBet}`);
-    
-    // Handle side pot creation
-    const maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet));
+
+    // ✅ Handle side pots correctly for re-shoves
     table.sidePots = table.sidePots || [];
+    let maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet));
+
     if (totalBet > maxEffectiveStack) {
-        console.log(`${player.name} raised beyond the effective stack, creating a side pot`);
+        console.log(`${player.name} re-shoved beyond the effective stack, creating a new side pot`);
         table.sidePots.push({
             amount: totalBet - maxEffectiveStack,
             eligiblePlayers: table.players.filter(p => p.currentBet >= totalBet)
         });
     }
-    
+
+    // ✅ If a player raises above all others' stacks, refund excess
+    let remainingPlayers = table.players.filter(p => p.tokens > 0 || p.allIn);
+    let highestAllIn = Math.max(...remainingPlayers.map(p => p.currentBet));
+
+    table.players.forEach(p => {
+        if (p.currentBet > highestAllIn) {
+            let refund = p.currentBet - highestAllIn;
+            p.tokens += refund;
+            table.pot -= refund;
+            p.currentBet = highestAllIn;
+            console.log(`💸 ${p.name} gets refunded ${refund} chips.`);
+        }
+    });
+
     table.currentBet = totalBet;
-    table.playersWhoActed.clear(); // Reset for new round
+    table.playersWhoActed.clear();
     table.playersWhoActed.add(player.name);
     
-    broadcast({
-        type: "updateActionHistory",
-        action: `${data.playerName} raised to ${totalBet}`
-    }, tableId);
     broadcast({ type: "raise", playerName: data.playerName, amount: totalBet, tableId: tableId }, tableId);
     
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
@@ -836,63 +858,32 @@ function handleCall(data, tableId) {
     if (!table) return;
 
     console.log(` 🔄  ${data.playerName} performed action: ${data.type}`);
-    console.log("Before updating playersWhoActed:", [...table.playersWhoActed]);
-
     const player = table.players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
-        return;
-    }
+    if (!player) return;
 
-    const callAmount = table.currentBet - player.currentBet;
+    let callAmount = table.currentBet - player.currentBet;
     if (callAmount > player.tokens) {
-        // Player is calling all-in with less than the required amount
-        const allInAmount = player.tokens;
+        let allInAmount = player.tokens;
         player.tokens = 0;
         player.currentBet += allInAmount;
         table.pot += allInAmount;
         player.allIn = true;
-        
+
         console.log(`${player.name} goes all-in for ${allInAmount}`);
 
-        // Adjust the bet to match the all-in call
-        if (allInAmount < callAmount) {
-            console.log(`${data.playerName} could not match ${table.currentBet}, adjusting side pot`);
-            table.sidePots = table.sidePots || [];
-            table.sidePots.push({
-                amount: callAmount - allInAmount,
-                eligiblePlayers: table.players.filter(p => p.currentBet >= callAmount)
-            });
-        }
+        // ✅ Handle side pot creation
+        table.sidePots = table.sidePots || [];
+        table.sidePots.push({
+            amount: callAmount - allInAmount,
+            eligiblePlayers: table.players.filter(p => p.currentBet >= callAmount)
+        });
     } else {
         player.tokens -= callAmount;
         table.pot += callAmount;
         player.currentBet = table.currentBet;
     }
 
-    // Handle re-shove scenario
-    const remainingPlayers = table.players.filter(p => p.tokens > 0 && !p.allIn);
-    if (remainingPlayers.length === 1) {
-        // If only one player left, excess chips must be refunded to over-betting player
-        const maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet));
-        table.players.forEach(p => {
-            if (p.currentBet > maxEffectiveStack) {
-                const excess = p.currentBet - maxEffectiveStack;
-                p.tokens += excess;
-                p.currentBet = maxEffectiveStack;
-                table.pot -= excess;
-                console.log(`${p.name} gets refunded ${excess} chips.`);
-            }
-        });
-    }
-
     table.playersWhoActed.add(player.name);
-    console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
-
-    broadcast({
-        type: "updateActionHistory",
-        action: `${data.playerName} called ${Math.min(callAmount, player.tokens)}`
-    }, tableId);
     broadcast({ type: "call", playerName: data.playerName, tableId: tableId }, tableId);
 
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
@@ -904,6 +895,7 @@ function handleCall(data, tableId) {
     }
     broadcastGameState(tableId);
 }
+
 function handleFold(data, tableId) {
 const table = tables.get(tableId);
 if (!table) return;
