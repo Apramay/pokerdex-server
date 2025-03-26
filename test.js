@@ -341,7 +341,7 @@ function nextRound(tableId) {
         tableCards.push(manualTurn); // Set manual turn card
             // Turn
             broadcast({ type: "message", text: `Turn: ${JSON.stringify(table.tableCards[3])}` , tableId: tableId }, tableId)
-        }
+        
     } else if (table.round === 2) {
         table.round++;
                 tableCards.push(manualRiver); // Set manual river card
@@ -349,7 +349,7 @@ function nextRound(tableId) {
             // Turn
             broadcast({ type: "message", text: `River: ${JSON.stringify(table.tableCards[4])}` ,tableId: tableId }, tableId);
         }
-    } else if (table.round === 3) {
+    else if (table.round === 3) {
         showdown(tableId);
         return;
     }
