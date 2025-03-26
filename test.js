@@ -503,37 +503,37 @@ function resetGame(tableId) {
     startNewHand(tableId); //  ✅  Start the new round with correct dealer
 }
 function determineWinners(playerList, table) {
-    if (playerList.length === 0) {
-        return [];
-    }
+    if (playerList.length === 0) return [];
+
     let bestHandValue = -1;
     let winners = [];
     let bestHandDetails = null;
-    // To store best hand details for tiebreakers
+
     playerList.forEach(player => {
         if (player.status !== "folded") {
             const fullHand = player.hand.concat(table.tableCards);
             const { handValue, bestCards } = evaluateHand(fullHand);
+
             if (handValue > bestHandValue) {
                 bestHandValue = handValue;
-
                 winners = [player];
                 bestHandDetails = bestCards;
             } else if (handValue === bestHandValue) {
-                //  ✅  Handle tie cases by comparing kicker
-                if (compareHands(bestCards, bestHandDetails) > 0) {
-
+                // ✅ Use kickers to break ties
+                const comparison = compareHands(bestCards, bestHandDetails);
+                if (comparison > 0) {
                     winners = [player]; // New best kicker
                     bestHandDetails = bestCards;
-                } else if (compareHands(bestCards, bestHandDetails) === 0) {
+                } else if (comparison === 0) {
                     winners.push(player); // Exact tie, add both winners
-
                 }
             }
         }
     });
+
     return winners;
 }
+
 // Function to evaluate the hand of a player
 function evaluateHand(cards) {
     const sortedHand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
@@ -643,9 +643,9 @@ function compareHands(handA, handB) {
         if (rankValues[handA[i].rank] > rankValues[handB[i].rank]) return 1;
         if (rankValues[handA[i].rank] < rankValues[handB[i].rank]) return -1;
     }
-    return 0;
-    // Exact tie
+    return 0; // Exact tie
 }
+
 // WebSocket server event handling
 wss.on('connection', function connection(ws) {
     console.log(' ✅  A new client connected');
