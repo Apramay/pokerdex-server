@@ -741,15 +741,12 @@ function isOnePair(hand, ranks) {
     return false;
 }
 function compareHands(handA, handB) {
-    const handAValues = handA.map(card => rankValues[card.rank]).sort((a, b) => b - a);
-    const handBValues = handB.map(card => rankValues[card.rank]).sort((a, b) => b - a);
-
-    for (let i = 0; i < Math.min(handAValues.length, handBValues.length); i++) {
-        if (handAValues[i] > handBValues[i]) return 1; // Hand A wins
-        if (handAValues[i] < handBValues[i]) return -1; // Hand B wins
+    for (let i = 0; i < Math.min(handA.length, handB.length); i++) {
+        if (rankValues[handA[i].rank] > rankValues[handB[i].rank]) return 1;
+        if (rankValues[handA[i].rank] < rankValues[handB[i].rank]) return -1;
     }
-
-    return 0; // Exact tie
+    return 0;
+    // Exact tie
 }
 
 
@@ -911,6 +908,10 @@ function handleRaise(data, tableId) {
     table.currentBet = totalBet;
     table.playersWhoActed.clear();
     table.playersWhoActed.add(player.name);
+     broadcast({
+        type: "updateActionHistory",
+        action: `${data.playerName} raised to ${totalBet}`
+    }, tableId);
     
     broadcast({ type: "raise", playerName: data.playerName, amount: totalBet, tableId: tableId }, tableId);
     
@@ -991,6 +992,10 @@ function handleCall(data, tableId) {
     }
 
     table.playersWhoActed.add(player.name);
+    broadcast({
+        type: "updateActionHistory",
+        action: `${data.playerName} called ${Math.min(callAmount, player.tokens)}`
+    }, tableId);
     broadcast({ type: "call", playerName: data.playerName, tableId: tableId }, tableId);
 
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
