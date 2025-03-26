@@ -422,17 +422,18 @@ function distributePot(tableId) {
 
     console.log("💰 Distributing the pot...");
 
-    let allPlayers = table.players.filter(p => p.status !== "folded");
+    // Only include players who didn't fold
+    const allPlayers = table.players.filter(p => p.status !== "folded");
     allPlayers.sort((a, b) => a.currentBet - b.currentBet);
 
     let remainingPot = table.pot;
     let pots = [];
     let lastLevel = 0;
 
+    // 🔹 Create side/main pots based on currentBet tiers
     for (let i = 0; i < allPlayers.length; i++) {
         const player = allPlayers[i];
         const level = player.currentBet;
-
         const numPlayers = allPlayers.length - i;
         const potAmount = (level - lastLevel) * numPlayers;
 
@@ -443,20 +444,30 @@ function distributePot(tableId) {
         }
     }
 
-    // Award each pot
+    // 🏆 Distribute each pot to eligible winners
     pots.forEach((pot, index) => {
         const winners = determineWinners(pot.eligiblePlayers, table);
         const split = Math.floor(pot.amount / winners.length);
         const leftover = pot.amount % winners.length;
 
         winners.forEach((winner, i) => {
-            const bonus = i === 0 ? leftover : 0; // Give leftover chips to first winner
-            winner.tokens += split + bonus;
-            console.log(`🏆 ${winner.name} wins ${split + bonus} from pot ${index + 1}`);
+            const bonus = i === 0 ? leftover : 0; // Give leftover to first winner
+            const totalWin = split + bonus;
+            winner.tokens += totalWin;
+            table.pot -= totalWin;
+
+            console.log(`🏆 ${winner.name} wins ${totalWin} from pot ${index + 1}`);
         });
     });
 
+    // ✅ Reset player currentBet to 0 for next hand
+    table.players.forEach(p => p.currentBet = 0);
+
+    // ✅ Clean up pot state
     table.pot = 0;
+    table.sidePots = [];
+
+    console.log("✅ Pot fully distributed. Remaining table pot:", table.pot);
 }
 
 
