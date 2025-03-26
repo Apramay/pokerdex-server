@@ -439,30 +439,33 @@ function distributePot(tableId) {
     sidePots.forEach(sidePot => {
         let winners = determineWinners(sidePot.eligiblePlayers, table);
         let splitPot = Math.floor(sidePot.amount / winners.length);
+        
         winners.forEach(winner => {
             winner.tokens += splitPot;
             console.log(`🏆 ${winner.name} wins ${splitPot} from a side pot.`);
         });
+
+        let leftoverChips = sidePot.amount % winners.length;
+        if (leftoverChips > 0) {
+            winners[0].tokens += leftoverChips;
+            console.log(`💸 ${winners[0].name} gets ${leftoverChips} extra chip(s) due to rounding.`);
+        }
     });
 
     // ✅ Award the main pot
     let mainWinners = determineWinners(activePlayers, table);
     let splitPot = Math.floor(remainingPot / mainWinners.length);
+    
     mainWinners.forEach(winner => {
         winner.tokens += splitPot;
         console.log(`🏆 ${winner.name} wins ${splitPot} from the main pot.`);
     });
 
-    // ✅ Refund excess chips if necessary
-    let maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet));
-    table.players.forEach(player => {
-        if (player.currentBet > maxEffectiveStack) {
-            let refund = player.currentBet - maxEffectiveStack;
-            player.tokens += refund;
-            table.pot -= refund;
-            console.log(`💸 ${player.name} gets refunded ${refund} chips.`);
-        }
-    });
+    let leftoverMainPot = remainingPot % mainWinners.length;
+    if (leftoverMainPot > 0) {
+        mainWinners[0].tokens += leftoverMainPot;
+        console.log(`💸 ${mainWinners[0].name} gets ${leftoverMainPot} extra chip(s) due to rounding.`);
+    }
 
     table.pot = 0;
     table.sidePots = [];
@@ -508,6 +511,7 @@ function determineWinners(playerList, table) {
     let bestHandValue = -1;
     let winners = [];
     let bestHandDetails = null;
+    let boardBestHand = evaluateHand(table.tableCards);
 
     playerList.forEach(player => {
         if (player.status !== "folded") {
@@ -519,38 +523,111 @@ function determineWinners(playerList, table) {
                 winners = [player];
                 bestHandDetails = bestCards;
             } else if (handValue === bestHandValue) {
-                // ✅ Use kickers to break ties
                 const comparison = compareHands(bestCards, bestHandDetails);
                 if (comparison > 0) {
-                    winners = [player]; // New best kicker
+                    winners = [player];
                     bestHandDetails = bestCards;
                 } else if (comparison === 0) {
-                    winners.push(player); // Exact tie, add both winners
+                    winners.push(player);
                 }
             }
         }
     });
 
+    // ✅ If all winners have the same best hand as the board, everyone splits the pot
+    if (winners.every(winner => compareHands(evaluateHand(winner.hand.concat(table.tableCards)).bestCards, boardBestHand.bestCards) === 0)) {
+        console.log("⚖️  Board is the best hand. All remaining players split the pot.");
+        return playerList;
+    }
+
     return winners;
 }
 
+
 // Function to evaluate the hand of a player
 function evaluateHand(cards) {
-    const sortedHand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
-    const ranks = sortedHand.map(card => card.rank);
-    const suits = sortedHand.map(card => card.suit);
+    let sortedHand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
+    let ranks = sortedHand.map(card => card.rank);
+    let suits = sortedHand.map(card => card.suit);
 
-    if (isRoyalFlush(sortedHand, ranks, suits)) return { handValue: 10, bestCards: sortedHand, handType: "Royal Flush" };
-    if (isStraightFlush(sortedHand, ranks, suits)) return { handValue: 9, bestCards: sortedHand, handType: "Straight Flush" };
-    if (isFourOfAKind(sortedHand, ranks)) return { handValue: 8, bestCards: sortedHand, handType: "Four of a Kind" };
-    if (isFullHouse(sortedHand, ranks)) return { handValue: 7, bestCards: sortedHand, handType: "Full House" };
-    if (isFlush(sortedHand, suits)) return { handValue: 6, bestCards: sortedHand, handType: "Flush" };
-    if (isStraight(sortedHand, ranks)) return { handValue: 5, bestCards: sortedHand, handType: "Straight" };
-    if (isThreeOfAKind(sortedHand, ranks)) return { handValue: 4, bestCards: sortedHand, handType: "Three of a Kind" };
-    if (isTwoPair(sortedHand, ranks).result) return { handValue: 3, bestCards: sortedHand, handType: "Two Pair" };
-    if (isOnePair(sortedHand, ranks)) return { handValue: 2, bestCards: sortedHand, handType: "One Pair" };
-    return { handValue: 1, bestCards: sortedHand.slice(0, 5), handType: "High Card" };
+    // ✅ Handle flush first (since flush beats most hands)
+    let flushCards = isFlush(sortedHand, suits);
+    if (flushCards) {
+        return {
+            handValue: flushCards.highestRank === "A" ? 10 : 6, // Royal Flush (10) or normal Flush (6)
+            bestCards: flushCards.bestCards,
+            handType: flushCards.handType
+        };
+    }
+
+    // ✅ Handle straight (straight flushes will be checked separately)
+    let straightCards = isStraight(sortedHand, ranks);
+    if (straightCards) {
+        return {
+            handValue: straightCards.isRoyal ? 10 : straightCards.isStraightFlush ? 9 : 5,
+            bestCards: straightCards.bestCards,
+            handType: straightCards.handType
+        };
+    }
+
+    // ✅ Handle four-of-a-kind
+    let fourKind = isFourOfAKind(sortedHand, ranks);
+    if (fourKind) {
+        return {
+            handValue: 8,
+            bestCards: fourKind.bestCards,
+            handType: "Four of a Kind"
+        };
+    }
+
+    // ✅ Handle full house
+    let fullHouse = isFullHouse(sortedHand, ranks);
+    if (fullHouse) {
+        return {
+            handValue: 7,
+            bestCards: fullHouse.bestCards,
+            handType: "Full House"
+        };
+    }
+
+    // ✅ Handle three-of-a-kind
+    let threeKind = isThreeOfAKind(sortedHand, ranks);
+    if (threeKind) {
+        return {
+            handValue: 4,
+            bestCards: threeKind.bestCards,
+            handType: "Three of a Kind"
+        };
+    }
+
+    // ✅ Handle two pairs
+    let twoPair = isTwoPair(sortedHand, ranks);
+    if (twoPair.result) {
+        return {
+            handValue: 3,
+            bestCards: twoPair.bestCards,
+            handType: "Two Pair"
+        };
+    }
+
+    // ✅ Handle one pair
+    let onePair = isOnePair(sortedHand, ranks);
+    if (onePair) {
+        return {
+            handValue: 2,
+            bestCards: onePair.bestCards,
+            handType: "One Pair"
+        };
+    }
+
+    // ✅ Default: High card
+    return {
+        handValue: 1,
+        bestCards: sortedHand.slice(0, 5),
+        handType: "High Card"
+    };
 }
+
 
 // Helper functions to check for different hand types
 function isRoyalFlush(hand, ranks, suits) {
@@ -583,24 +660,49 @@ function isFullHouse(hand, ranks) {
     return three && pair;
 }
 function isFlush(hand, suits) {
-    return suits.every(suit => suit === suits[0]);
-}
-function isStraight(hand, ranks) {
-    const handValues = hand.map(card => rankValues[card.rank]) //  ✅  Renamed to avoid conflict
-        .sort((a, b) => a - b);
-    // Normal straight check
-    for (let i = 0; i <= handValues.length - 5; i++) {
-        if (handValues[i + 4] - handValues[i] === 4 &&
-            new Set(handValues.slice(i, i + 5)).size === 5) {
-            return true;
+    let suitCounts = {};
+    hand.forEach(card => {
+        if (!suitCounts[card.suit]) suitCounts[card.suit] = [];
+        suitCounts[card.suit].push(card);
+    });
+
+    for (let suit in suitCounts) {
+        if (suitCounts[suit].length >= 5) {
+            let flushCards = suitCounts[suit].slice(0, 5); // Take top 5 cards of the flush
+            return {
+                bestCards: flushCards,
+                highestRank: flushCards[0].rank,
+                handType: flushCards[0].rank === "A" ? "Royal Flush" : "Flush"
+            };
         }
-    }
-    // Special case: A, 2, 3, 4, 5 (Low Straight)
-    if (handValues.includes(14) && handValues.slice(0, 4).join() === "2,3,4,5") {
-        return true;
     }
     return false;
 }
+
+function isStraight(hand, ranks) {
+    let uniqueRanks = [...new Set(ranks.map(rank => rankValues[rank]))].sort((a, b) => b - a);
+
+    for (let i = 0; i <= uniqueRanks.length - 5; i++) {
+        if (uniqueRanks[i] - uniqueRanks[i + 4] === 4) {
+            return {
+                bestCards: hand.filter(card => uniqueRanks.slice(i, i + 5).includes(rankValues[card.rank])).slice(0, 5),
+                handType: "Straight",
+                isStraightFlush: isFlush(hand, hand.map(c => c.suit)) !== false
+            };
+        }
+    }
+
+    // ✅ Handle A-2-3-4-5 (Low Straight)
+    if (uniqueRanks.includes(14) && uniqueRanks.slice(-4).join() === "5,4,3,2") {
+        return {
+            bestCards: hand.filter(card => [14, 5, 4, 3, 2].includes(rankValues[card.rank])).slice(0, 5),
+            handType: "Straight"
+        };
+    }
+
+    return false;
+}
+
 function isThreeOfAKind(hand, ranks) {
     for (let rank of ranks) {
         if (ranks.filter(r => r === rank).length === 3) {
@@ -639,12 +741,17 @@ function isOnePair(hand, ranks) {
     return false;
 }
 function compareHands(handA, handB) {
-    for (let i = 0; i < Math.min(handA.length, handB.length); i++) {
-        if (rankValues[handA[i].rank] > rankValues[handB[i].rank]) return 1;
-        if (rankValues[handA[i].rank] < rankValues[handB[i].rank]) return -1;
+    const handAValues = handA.map(card => rankValues[card.rank]).sort((a, b) => b - a);
+    const handBValues = handB.map(card => rankValues[card.rank]).sort((a, b) => b - a);
+
+    for (let i = 0; i < Math.min(handAValues.length, handBValues.length); i++) {
+        if (handAValues[i] > handBValues[i]) return 1; // Hand A wins
+        if (handAValues[i] < handBValues[i]) return -1; // Hand B wins
     }
+
     return 0; // Exact tie
 }
+
 
 // WebSocket server event handling
 wss.on('connection', function connection(ws) {
