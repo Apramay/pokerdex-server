@@ -741,13 +741,18 @@ function isOnePair(hand, ranks) {
     return false;
 }
 function compareHands(handA, handB) {
+    if (!handA || !handB) {
+        console.error("Invalid hands for comparison", handA, handB);
+        return 0; // Or handle the case more appropriately depending on the game's rules
+    }
+
     for (let i = 0; i < Math.min(handA.length, handB.length); i++) {
         if (rankValues[handA[i].rank] > rankValues[handB[i].rank]) return 1;
         if (rankValues[handA[i].rank] < rankValues[handB[i].rank]) return -1;
     }
-    return 0;
-    // Exact tie
+    return 0; // Exact tie
 }
+
 
 
 // WebSocket server event handling
