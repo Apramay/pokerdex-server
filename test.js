@@ -358,12 +358,12 @@ function nextRound(tableId) {
 }
 const manualFlop = [
     { suit: "Hearts", rank: "10" },
-    { suit: "Hearts", rank: "K" },
+    { suit: "Spades", rank: "10" },
     { suit: "Hearts", rank: "Q" }
 ];
 
 const manualTurn = { suit: "Hearts", rank: "A" };
-const manualRiver = { suit: "Hearts", rank: "J" };
+const manualRiver = { suit: "Clubs", rank: "10" };
 
 function showdown(tableId) {
     const table = tables.get(tableId);
