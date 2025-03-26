@@ -413,52 +413,71 @@ function distributePot(tableId) {
 
     console.log("💰 Distributing the pot...");
 
-    // Only include players who didn't fold
-    const allPlayers = table.players.filter(p => p.status !== "folded");
-    allPlayers.sort((a, b) => a.currentBet - b.currentBet);
+    let activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
+    activePlayers.sort((a, b) => a.currentBet - b.currentBet);
 
-    let remainingPot = table.pot;
-    let pots = [];
-    let lastLevel = 0;
+    let totalPot = table.pot;
+    let remainingPot = totalPot;
+    let lastBet = 0;
+    let sidePots = [];
 
-    // 🔹 Create side/main pots based on currentBet tiers
-    for (let i = 0; i < allPlayers.length; i++) {
-        const player = allPlayers[i];
-        const level = player.currentBet;
-        const numPlayers = allPlayers.length - i;
-        const potAmount = (level - lastLevel) * numPlayers;
+    // ✅ Step 1: Create side pots based on all-in amounts
+    for (let i = 0; i < activePlayers.length; i++) {
+        let player = activePlayers[i];
+        let sidePotAmount = (player.currentBet - lastBet) * (activePlayers.length - i);
 
-        if (potAmount > 0) {
-            const eligible = allPlayers.slice(i);
-            pots.push({ amount: potAmount, eligiblePlayers: eligible });
-            lastLevel = level;
+        if (sidePotAmount > 0) {
+            let amount = Math.min(sidePotAmount, remainingPot);
+            sidePots.push({
+                amount: amount,
+                eligiblePlayers: activePlayers.slice(i),
+                contributed: activePlayers.slice(i).map(p => p.currentBet - lastBet) // Track contributions
+            });
+            remainingPot -= amount;
         }
+        lastBet = player.currentBet;
     }
 
-    // 🏆 Distribute each pot to eligible winners
-    pots.forEach((pot, index) => {
-        const winners = determineWinners(pot.eligiblePlayers, table);
-        const split = Math.floor(pot.amount / winners.length);
-        const leftover = pot.amount % winners.length;
+    // ✅ Step 2: Award each side pot proportionally to winners
+    sidePots.forEach(sidePot => {
+        let winners = determineWinners(sidePot.eligiblePlayers, table);
+        let totalContribution = sidePot.contributed.reduce((sum, c) => sum + c, 0);
 
-        winners.forEach((winner, i) => {
-            const bonus = i === 0 ? leftover : 0; // Give leftover to first winner
-            const totalWin = split + bonus;
-            winner.tokens += totalWin;
-
-            console.log(`🏆 ${winner.name} wins ${totalWin} from pot ${index + 1}`);
+        winners.forEach(winner => {
+            let winnerShare = sidePot.contributed[sidePot.eligiblePlayers.indexOf(winner)] / totalContribution;
+            let winnings = Math.floor(sidePot.amount * winnerShare);
+            winner.tokens += winnings;
+            console.log(`🏆 ${winner.name} wins ${winnings} from a side pot.`);
         });
     });
 
-    // ✅ Reset player currentBet to 0 for next hand
-    table.players.forEach(p => p.currentBet = 0);
+    // ✅ Step 3: Award the main pot
+    let mainWinners = determineWinners(activePlayers, table);
+    let totalMainContribution = activePlayers.reduce((sum, p) => sum + p.currentBet, 0);
 
-    // ✅ Clean up pot state
+    mainWinners.forEach(winner => {
+        let winnerShare = winner.currentBet / totalMainContribution;
+        let winnings = Math.floor(remainingPot * winnerShare);
+        winner.tokens += winnings;
+        console.log(`🏆 ${winner.name} wins ${winnings} from the main pot.`);
+    });
+
+    // ✅ Step 4: Refund excess chips
+    let maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet));
+    table.players.forEach(player => {
+        if (player.currentBet > maxEffectiveStack) {
+            let refund = player.currentBet - maxEffectiveStack;
+            player.tokens += refund;
+            table.pot -= refund;
+            console.log(`💸 ${player.name} gets refunded ${refund} chips.`);
+        }
+    });
+
+    // ✅ Reset pot and side pots
     table.pot = 0;
     table.sidePots = [];
-
-    console.log("✅ Pot fully distributed. Remaining table pot:", table.pot);
 }
+
 
 
 function resetGame(tableId) {
