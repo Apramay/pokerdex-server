@@ -454,7 +454,6 @@ function distributePot(tableId) {
             const bonus = i === 0 ? leftover : 0; // Give leftover to first winner
             const totalWin = split + bonus;
             winner.tokens += totalWin;
-            table.pot -= totalWin;
 
             console.log(`🏆 ${winner.name} wins ${totalWin} from pot ${index + 1}`);
         });
