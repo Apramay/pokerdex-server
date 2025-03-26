@@ -338,13 +338,13 @@ function nextRound(tableId) {
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(table.tableCards)}`, tableId: tableId }, tableId);
     } else if (table.round === 1) {
         table.round++;
-        tableCards.push(manualTurn); // Set manual turn card
+        table.tableCards.push(manualTurn); // Set manual turn card
             // Turn
             broadcast({ type: "message", text: `Turn: ${JSON.stringify(table.tableCards[3])}` , tableId: tableId }, tableId)
         
     } else if (table.round === 2) {
         table.round++;
-                tableCards.push(manualRiver); // Set manual river card
+                table.tableCards.push(manualRiver); // Set manual river card
 
             // Turn
             broadcast({ type: "message", text: `River: ${JSON.stringify(table.tableCards[4])}` ,tableId: tableId }, tableId);
