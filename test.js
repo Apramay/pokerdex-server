@@ -453,11 +453,11 @@ function distributePot(tableId) {
 
     // ✅ Step 3: Award the main pot
     let mainWinners = determineWinners(activePlayers, table);
-    let totalMainContribution = activePlayers.reduce((sum, p) => sum + p.currentBet, 0);
+    let totalMainContribution = activePlayers.reduce((sum, p) => sum + (p.currentBet || 0), 0) || 1; // Avoid division by zero
 
     mainWinners.forEach(winner => {
-        let winnerShare = winner.currentBet / totalMainContribution;
-        let winnings = Math.floor(remainingPot * winnerShare);
+         let winnerShare = winner.currentBet ? (winner.currentBet / totalMainContribution) : 0;
+        let winnings = remainingPot > 0 ? Math.floor(remainingPot * winnerShare) : 0;
         winner.tokens += winnings;
         console.log(`🏆 ${winner.name} wins ${winnings} from the main pot.`);
     });
