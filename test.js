@@ -537,14 +537,6 @@ function determineWinners(playerList, table) {
     return winners;
 }
 
-    // ✅ If all winners have the same best hand as the board, everyone splits the pot
-    if (winners.every(winner => compareHands(evaluateHand(winner.hand.concat(table.tableCards)).bestCards, boardBestHand.bestCards) === 0)) {
-        console.log("⚖️  Board is the best hand. All remaining players split the pot.");
-        return playerList;
-    }
-
-    return winners;
-}
 
 
 // Function to evaluate the hand of a player
