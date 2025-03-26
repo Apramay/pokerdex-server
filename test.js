@@ -523,16 +523,19 @@ function determineWinners(playerList, table) {
                 winners = [player];
                 bestHandDetails = bestCards;
             } else if (handValue === bestHandValue) {
-                const comparison = compareHands(bestCards, bestHandDetails);
-                if (comparison > 0) {
-                    winners = [player];
+                if (compareHands(bestCards, bestHandDetails) > 0) {
+
+                    winners = [player]; // New best kicker
                     bestHandDetails = bestCards;
-                } else if (comparison === 0) {
-                    winners.push(player);
+                } else if (compareHands(bestCards, bestHandDetails) === 0) {
+                    winners.push(player); // Exact tie, add both winners
+
                 }
             }
         }
     });
+    return winners;
+}
 
     // ✅ If all winners have the same best hand as the board, everyone splits the pot
     if (winners.every(winner => compareHands(evaluateHand(winner.hand.concat(table.tableCards)).bestCards, boardBestHand.bestCards) === 0)) {
@@ -741,11 +744,7 @@ function isOnePair(hand, ranks) {
     return false;
 }
 function compareHands(handA, handB) {
-    if (!handA || !handB) {
-        console.error("Invalid hands for comparison", handA, handB);
-        return 0; // Or handle the case more appropriately depending on the game's rules
-    }
-
+    
     for (let i = 0; i < Math.min(handA.length, handB.length); i++) {
         if (rankValues[handA[i].rank] > rankValues[handB[i].rank]) return 1;
         if (rankValues[handA[i].rank] < rankValues[handB[i].rank]) return -1;
