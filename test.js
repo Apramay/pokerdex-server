@@ -332,39 +332,30 @@ function nextRound(tableId) {
     console.log(" 🆕  New round started. Reset playersWhoActed."); //  ✅  Debugging log
     if (table.round === 0) {
         table.round++; 
-        table.tableCards = manualFlop; // Set manual flop cards
-
+        table.tableCards = dealHand(table.deckForGame, 3); // Flop
         console.log("🃏 Flop dealt:", table.tableCards);
         broadcast({ type: "message", text: `Flop: ${JSON.stringify(table.tableCards)}`, tableId: tableId }, tableId);
     } else if (table.round === 1) {
         table.round++;
-        table.tableCards.push(manualTurn); // Set manual turn card
+        if (table.deckForGame.length > 0) {
+            table.tableCards.push(dealHand(table.deckForGame, 1)[0]);
             // Turn
             broadcast({ type: "message", text: `Turn: ${JSON.stringify(table.tableCards[3])}` , tableId: tableId }, tableId)
-        
+        }
     } else if (table.round === 2) {
         table.round++;
-                table.tableCards.push(manualRiver); // Set manual river card
-
+        if (table.deckForGame.length > 0) {
+            table.tableCards.push(dealHand(table.deckForGame, 1)[0]);
             // Turn
             broadcast({ type: "message", text: `River: ${JSON.stringify(table.tableCards[4])}` ,tableId: tableId }, tableId);
         }
-    else if (table.round === 3) {
+    } else if (table.round === 3) {
         showdown(tableId);
         return;
     }
     broadcastGameState(tableId);
     setTimeout(() => startFlopBetting(tableId), 1500);
 }
-const manualFlop = [
-    { suit: "Hearts", rank: "10" },
-    { suit: "Spades", rank: "10" },
-    { suit: "Hearts", rank: "Q" }
-];
-
-const manualTurn = { suit: "Hearts", rank: "A" };
-const manualRiver = { suit: "Clubs", rank: "10" };
-
 function showdown(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
