@@ -547,50 +547,47 @@ function evaluateHand(cards) {
     const sortedHand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
     const ranks = sortedHand.map(card => card.rank);
     const suits = sortedHand.map(card => card.suit);
- if (isOnePair(sortedHand, ranks)) {
-             console.log("Evaluating One Pair...");
-
-        const { highPair, kicker } = isOnePair(sortedHand, ranks);
-        return { handValue: 2, bestCards: sortedHand, handType: "One Pair", kicker };
-    }
-    if (isRoyalFlush(sortedHand, ranks, suits)){
+ if (isRoyalFlush(sortedHand, ranks, suits)) {
         console.log("Evaluating Royal Flush...");
-
-        return { handValue: 10, bestCards: sortedHand, handType: "Royal Flush" };
+        return { handValue: 10, bestCards: sortedHand.slice(0, 5), handType: "Royal Flush", kicker: -1 };
     }
-    if (isStraightFlush(sortedHand, ranks, suits)){
+    if (isStraightFlush(sortedHand, ranks, suits)) {
         console.log("Evaluating Straight Flush...");
-        return { handValue: 9, bestCards: sortedHand, handType: "Straight Flush" };
+        return { handValue: 9, bestCards: sortedHand.slice(0, 5), handType: "Straight Flush", kicker: -1 };
     }
     if (isFourOfAKind(sortedHand, ranks)) {
         console.log("Evaluating Four of a Kind...");
-return { handValue: 8, bestCards: sortedHand, handType: "Four of a Kind" };
+        return { handValue: 8, bestCards: sortedHand.slice(0, 5), handType: "Four of a Kind", kicker: -1 };
     }
     if (isFullHouse(sortedHand, ranks)) {
-        console.log("Evaluating Full House..."); 
-        return { handValue: 7, bestCards: sortedHand, handType: "Full House" };
+        console.log("Evaluating Full House...");
+        return { handValue: 7, bestCards: sortedHand.slice(0, 5), handType: "Full House", kicker: -1 };
     }
-    if (isFlush(sortedHand, suits))  {
+    if (isFlush(sortedHand, suits)) {
         console.log("Evaluating Flush...");
-        return { handValue: 6, bestCards: sortedHand, handType: "Flush" };
+        return { handValue: 6, bestCards: sortedHand.slice(0, 5), handType: "Flush", kicker: sortedHand[0].rank }; // Use highest card in flush for kicker
     }
-    if (isStraight(sortedHand, ranks))  {
+    if (isStraight(sortedHand, ranks)) {
         console.log("Evaluating Straight...");
-        return { handValue: 5, bestCards: sortedHand, handType: "Straight" };
+        return { handValue: 5, bestCards: sortedHand.slice(0, 5), handType: "Straight", kicker: sortedHand[0].rank };
     }
-    if (isThreeOfAKind(sortedHand, ranks))  {
-        console.log("Evaluating Three of a kind...");
-        return { handValue: 4, bestCards: sortedHand, handType: "Three of a Kind" };
+    if (isThreeOfAKind(sortedHand, ranks)) {
+        console.log("Evaluating Three of a Kind...");
+        return { handValue: 4, bestCards: sortedHand.slice(0, 5), handType: "Three of a Kind", kicker: -1 };
     }
-if (isTwoPair(sortedHand, ranks).result) {
-            console.log("Evaluating Two Pair...");
-
+    if (isTwoPair(sortedHand, ranks).result) {
+        console.log("Evaluating Two Pair...");
         const { highPair, lowPair, kicker } = isTwoPair(sortedHand, ranks);
-        return { handValue: 3, bestCards: sortedHand, handType: "Two Pair", kicker };
+        return { handValue: 3, bestCards: sortedHand.slice(0, 5), handType: "Two Pair", kicker: kicker };
+    }
+    if (isOnePair(sortedHand, ranks)) {
+        console.log("Evaluating One Pair...");
+        const { highPair, kicker } = isOnePair(sortedHand, ranks);
+        return { handValue: 2, bestCards: sortedHand.slice(0, 5), handType: "One Pair", kicker: kicker };
     }
         console.log("Evaluating High Card...");
 
-    return { handValue: 1, bestCards: sortedHand.slice(0, 5), handType: "High Card" };
+    return { handValue: 1, bestCards: sortedHand.slice(0, 5), handType: "High Card", kicker: sortedHand[0].rank };
 }
 
 // Helper functions to check for different hand types
