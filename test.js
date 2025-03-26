@@ -507,12 +507,20 @@ function determineWinners(playerList, table) {
         if (player.status !== "folded") {
             const fullHand = player.hand.concat(table.tableCards);
             const { handValue, bestCards, kicker } = evaluateHand(fullHand);
+ console.log(`Player ${player.name} evaluated hand:`);
+            console.log(`Full Hand: ${JSON.stringify(fullHand.map(card => card.rank + card.suit))}`);
+            console.log(`Hand Type: ${handType}`);
+            console.log(`Hand Value: ${handValue}`);
+            console.log(`Best Cards: ${JSON.stringify(bestCards.map(card => card.rank + card.suit))}`);
+            console.log(`Kicker: ${kicker}`);
             if (handValue > bestHandValue) {
                 bestHandValue = handValue;
 
                 winners = [player];
                 bestHandDetails = bestCards;
                                 bestKicker = kicker; // Update kicker if new best hand
+                                console.log(`New best hand found for ${player.name}: ${handType}`);
+
 
             } else if (handValue === bestHandValue) {
                 //  ✅  Handle tie cases by comparing kicker
@@ -521,9 +529,12 @@ function determineWinners(playerList, table) {
                     winners = [player]; // New best kicker
                     bestHandDetails = bestCards;
                                         bestKicker = kicker;
+                    console.log(`New kicker found for ${player.name}.`);
 
                 } else if (kicker === bestKicker) {
                     winners.push(player); // Exact tie, add both winners
+                    console.log(`Tie detected, adding ${player.name} as a winner.`);
+
 
                 }
             }
@@ -537,20 +548,48 @@ function evaluateHand(cards) {
     const ranks = sortedHand.map(card => card.rank);
     const suits = sortedHand.map(card => card.suit);
  if (isOnePair(sortedHand, ranks)) {
+             console.log("Evaluating One Pair...");
+
         const { highPair, kicker } = isOnePair(sortedHand, ranks);
         return { handValue: 2, bestCards: sortedHand, handType: "One Pair", kicker };
     }
-    if (isRoyalFlush(sortedHand, ranks, suits)) return { handValue: 10, bestCards: sortedHand, handType: "Royal Flush" };
-    if (isStraightFlush(sortedHand, ranks, suits)) return { handValue: 9, bestCards: sortedHand, handType: "Straight Flush" };
-    if (isFourOfAKind(sortedHand, ranks)) return { handValue: 8, bestCards: sortedHand, handType: "Four of a Kind" };
-    if (isFullHouse(sortedHand, ranks)) return { handValue: 7, bestCards: sortedHand, handType: "Full House" };
-    if (isFlush(sortedHand, suits)) return { handValue: 6, bestCards: sortedHand, handType: "Flush" };
-    if (isStraight(sortedHand, ranks)) return { handValue: 5, bestCards: sortedHand, handType: "Straight" };
-    if (isThreeOfAKind(sortedHand, ranks)) return { handValue: 4, bestCards: sortedHand, handType: "Three of a Kind" };
+    if (isRoyalFlush(sortedHand, ranks, suits)){
+        console.log("Evaluating Royal Flush...");
+
+        return { handValue: 10, bestCards: sortedHand, handType: "Royal Flush" };
+    }
+    if (isStraightFlush(sortedHand, ranks, suits)){
+        console.log("Evaluating Straight Flush...");
+        return { handValue: 9, bestCards: sortedHand, handType: "Straight Flush" };
+    }
+    if (isFourOfAKind(sortedHand, ranks)) {
+        console.log("Evaluating Four of a Kind...");
+return { handValue: 8, bestCards: sortedHand, handType: "Four of a Kind" };
+    }
+    if (isFullHouse(sortedHand, ranks)) {
+        console.log("Evaluating Full House..."); 
+        return { handValue: 7, bestCards: sortedHand, handType: "Full House" };
+    }
+    if (isFlush(sortedHand, suits))  {
+        console.log("Evaluating Flush...");
+        return { handValue: 6, bestCards: sortedHand, handType: "Flush" };
+    }
+    if (isStraight(sortedHand, ranks))  {
+        console.log("Evaluating Straight...");
+        return { handValue: 5, bestCards: sortedHand, handType: "Straight" };
+    }
+    if (isThreeOfAKind(sortedHand, ranks))  {
+        console.log("Evaluating Three of a kind...");
+        return { handValue: 4, bestCards: sortedHand, handType: "Three of a Kind" };
+    }
 if (isTwoPair(sortedHand, ranks).result) {
+            console.log("Evaluating Two Pair...");
+
         const { highPair, lowPair, kicker } = isTwoPair(sortedHand, ranks);
         return { handValue: 3, bestCards: sortedHand, handType: "Two Pair", kicker };
     }
+        console.log("Evaluating High Card...");
+
     return { handValue: 1, bestCards: sortedHand.slice(0, 5), handType: "High Card" };
 }
 
