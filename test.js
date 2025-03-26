@@ -421,52 +421,42 @@ function distributePot(tableId) {
     if (!table) return;
 
     console.log("💰 Distributing the pot...");
-    let activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
-    activePlayers.sort((a, b) => a.currentBet - b.currentBet);
 
-    let totalPot = table.pot;
-    let sidePots = [];
-    let remainingPot = totalPot;
-    let lastBet = 0;
+    let allPlayers = table.players.filter(p => p.status !== "folded");
+    allPlayers.sort((a, b) => a.currentBet - b.currentBet);
 
-    // Create multiple side pots based on increasing all-in amounts
-    for (let i = 0; i < activePlayers.length; i++) {
-        let player = activePlayers[i];
-        let sidePotAmount = (player.currentBet - lastBet) * (activePlayers.length - i);
-        if (sidePotAmount > 0) {
-            sidePots.push({
-                amount: sidePotAmount,
-                eligiblePlayers: activePlayers.slice(i)
-            });
-            remainingPot -= sidePotAmount;
+    let remainingPot = table.pot;
+    let pots = [];
+    let lastLevel = 0;
+
+    for (let i = 0; i < allPlayers.length; i++) {
+        const player = allPlayers[i];
+        const level = player.currentBet;
+
+        const numPlayers = allPlayers.length - i;
+        const potAmount = (level - lastLevel) * numPlayers;
+
+        if (potAmount > 0) {
+            const eligible = allPlayers.slice(i);
+            pots.push({ amount: potAmount, eligiblePlayers: eligible });
+            lastLevel = level;
         }
-        lastBet = player.currentBet;
     }
-    if (remainingPot < 0) remainingPot = 0;
 
-    // Award side pots
-    sidePots.forEach(sidePot => {
-        let winners = determineWinners(sidePot.eligiblePlayers, table);
-        let splitPot = Math.floor(sidePot.amount / winners.length);
-        winners.forEach(winner => {
-            winner.tokens += splitPot;
-            console.log(`🏆 ${winner.name} wins ${splitPot} from a side pot.`);
+    // Award each pot
+    pots.forEach((pot, index) => {
+        const winners = determineWinners(pot.eligiblePlayers, table);
+        const split = Math.floor(pot.amount / winners.length);
+        const leftover = pot.amount % winners.length;
+
+        winners.forEach((winner, i) => {
+            const bonus = i === 0 ? leftover : 0; // Give leftover chips to first winner
+            winner.tokens += split + bonus;
+            console.log(`🏆 ${winner.name} wins ${split + bonus} from pot ${index + 1}`);
         });
     });
 
-    // Award main pot
-        if (remainingPot > 0) {
-
-    let mainWinners = determineWinners(activePlayers, table);
-    let splitPot = Math.floor(remainingPot / mainWinners.length);
-    mainWinners.forEach(winner => {
-        winner.tokens += splitPot;
-        console.log(`🏆 ${winner.name} wins ${splitPot} from the main pot.`);
-    });
-    }
-
     table.pot = 0;
-    table.sidePots = [];
 }
 
 
@@ -503,54 +493,49 @@ function resetGame(tableId) {
     startNewHand(tableId); //  ✅  Start the new round with correct dealer
 }
 function determineWinners(playerList, table) {
-    if (playerList.length === 0) {
-        return [];
-    }
+    if (playerList.length === 0) return [];
+
     let bestHandValue = -1;
     let winners = [];
-    let bestHandDetails = null;
-        let bestKicker = -1; // To store the best kicker
+    let bestHand = null;
 
-    // To store best hand details for tiebreakers
     playerList.forEach(player => {
-        if (player.status !== "folded") {
-            const fullHand = player.hand.concat(table.tableCards);
-            const { handValue, bestCards, kicker, handType } = evaluateHand(fullHand);
- console.log(`Player ${player.name} evaluated hand:`);
-            console.log(`Full Hand: ${JSON.stringify(fullHand.map(card => card.rank + card.suit))}`);
-            console.log(`Hand Type: ${handType}`);
-            console.log(`Hand Value: ${handValue}`);
-            console.log(`Best Cards: ${JSON.stringify(bestCards.map(card => card.rank + card.suit))}`);
-            console.log(`Kicker: ${kicker}`);
-            if (handValue > bestHandValue) {
-                bestHandValue = handValue;
+        if (player.status === "folded") return;
 
+        const fullHand = player.hand.concat(table.tableCards);
+        const { handValue, bestCards, kicker, handType } = evaluateHand(fullHand);
+
+        console.log(`Player ${player.name} evaluated hand:`);
+        console.log(`Full Hand: ${JSON.stringify(fullHand.map(card => card.rank + card.suit))}`);
+        console.log(`Hand Type: ${handType}`);
+        console.log(`Hand Value: ${handValue}`);
+        console.log(`Best Cards: ${JSON.stringify(bestCards.map(card => card.rank + card.suit))}`);
+        console.log(`Kicker: ${kicker}`);
+
+        const comparison = bestHand
+            ? compareHands(bestCards, bestHand)
+            : 1;
+
+        if (handValue > bestHandValue) {
+            winners = [player];
+            bestHandValue = handValue;
+            bestHand = bestCards;
+            console.log(`New best hand found for ${player.name}: ${handType}`);
+        } else if (handValue === bestHandValue) {
+            if (comparison > 0) {
                 winners = [player];
-                bestHandDetails = bestCards;
-                                bestKicker = kicker; // Update kicker if new best hand
-                                console.log(`New best hand found for ${player.name}: ${handType}`);
-
-
-            } else if (handValue === bestHandValue) {
-                //  ✅  Handle tie cases by comparing kicker
-                if (kicker > bestKicker) {
-
-                    winners = [player]; // New best kicker
-                    bestHandDetails = bestCards;
-                                        bestKicker = kicker;
-                    console.log(`New kicker found for ${player.name}.`);
-
-                } else if (kicker === bestKicker) {
-                    winners.push(player); // Exact tie, add both winners
-                    console.log(`Tie detected, adding ${player.name} as a winner.`);
-
-
-                }
+                bestHand = bestCards;
+                console.log(`New better kicker found for ${player.name}.`);
+            } else if (comparison === 0) {
+                winners.push(player);
+                console.log(`Tie detected, adding ${player.name} as a winner.`);
             }
         }
     });
+
     return winners;
 }
+
 // Function to evaluate the hand of a player
 function evaluateHand(cards) {
     const combinations = getAllFiveCardCombos(cards);
@@ -763,13 +748,16 @@ function isOnePair(hand, ranks) {
     return false;
 }
 function compareHands(handA, handB) {
-    for (let i = 0; i < Math.min(handA.length, handB.length); i++) {
-        if (rankValues[handA[i].rank] > rankValues[handB[i].rank]) return 1;
-        if (rankValues[handA[i].rank] < rankValues[handB[i].rank]) return -1;
+    const valuesA = handA.map(c => rankValues[c.rank]).sort((a, b) => b - a);
+    const valuesB = handB.map(c => rankValues[c.rank]).sort((a, b) => b - a);
+
+    for (let i = 0; i < 5; i++) {
+        if (valuesA[i] > valuesB[i]) return 1;
+        if (valuesA[i] < valuesB[i]) return -1;
     }
-    return 0;
-    // Exact tie
+    return 0; // exact tie
 }
+
 // WebSocket server event handling
 wss.on('connection', function connection(ws) {
     console.log(' ✅  A new client connected');
