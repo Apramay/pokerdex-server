@@ -553,50 +553,127 @@ function determineWinners(playerList, table) {
 }
 // Function to evaluate the hand of a player
 function evaluateHand(cards) {
-    const sortedHand = cards.slice().sort((a, b) => rankValues[b.rank] - rankValues[a.rank]);
-    const ranks = sortedHand.map(card => card.rank);
-    const suits = sortedHand.map(card => card.suit);
- if (isRoyalFlush(sortedHand, ranks, suits)) {
-        console.log("Evaluating Royal Flush...");
-        return { handValue: 10, bestCards: sortedHand.slice(0, 5), handType: "Royal Flush", kicker: -1 };
-    }
-    if (isStraightFlush(sortedHand, ranks, suits)) {
-        console.log("Evaluating Straight Flush...");
-        return { handValue: 9, bestCards: sortedHand.slice(0, 5), handType: "Straight Flush", kicker: -1 };
-    }
-    if (isFourOfAKind(sortedHand, ranks)) {
-        console.log("Evaluating Four of a Kind...");
-        return { handValue: 8, bestCards: sortedHand.slice(0, 5), handType: "Four of a Kind", kicker: -1 };
-    }
-    if (isFullHouse(sortedHand, ranks)) {
-        console.log("Evaluating Full House...");
-        return { handValue: 7, bestCards: sortedHand.slice(0, 5), handType: "Full House", kicker: -1 };
-    }
-    if (isFlush(sortedHand, suits)) {
-        console.log("Evaluating Flush...");
-        return { handValue: 6, bestCards: sortedHand.slice(0, 5), handType: "Flush", kicker: sortedHand[0].rank }; // Use highest card in flush for kicker
-    }
-    if (isStraight(sortedHand, ranks)) {
-        console.log("Evaluating Straight...");
-        return { handValue: 5, bestCards: sortedHand.slice(0, 5), handType: "Straight", kicker: sortedHand[0].rank };
-    }
-    if (isThreeOfAKind(sortedHand, ranks)) {
-        console.log("Evaluating Three of a Kind...");
-        return { handValue: 4, bestCards: sortedHand.slice(0, 5), handType: "Three of a Kind", kicker: -1 };
-    }
-    if (isTwoPair(sortedHand, ranks).result) {
-        console.log("Evaluating Two Pair...");
-        const { highPair, lowPair, kicker } = isTwoPair(sortedHand, ranks);
-        return { handValue: 3, bestCards: sortedHand.slice(0, 5), handType: "Two Pair", kicker: kicker };
-    }
-    if (isOnePair(sortedHand, ranks)) {
-        console.log("Evaluating One Pair...");
-        const { highPair, kicker } = isOnePair(sortedHand, ranks);
-        return { handValue: 2, bestCards: sortedHand.slice(0, 5), handType: "One Pair", kicker: kicker };
-    }
-        console.log("Evaluating High Card...");
+    const combinations = getAllFiveCardCombos(cards);
+    let best = {
+        handValue: 0,
+        bestCards: [],
+        handType: "",
+        kicker: -1
+    };
 
-    return { handValue: 1, bestCards: sortedHand.slice(0, 5), handType: "High Card", kicker: sortedHand[0].rank };
+    for (let combo of combinations) {
+        const result = evaluateFiveCardHand(combo);
+        if (result.handValue > best.handValue ||
+            (result.handValue === best.handValue && compareHands(result.bestCards, best.bestCards) > 0)) {
+            best = result;
+        }
+    }
+
+    return best;
+}
+
+function getAllFiveCardCombos(cards) {
+    const results = [];
+    const combo = [];
+
+    function backtrack(start) {
+        if (combo.length === 5) {
+            results.push([...combo]);
+            return;
+        }
+        for (let i = start; i < cards.length; i++) {
+            combo.push(cards[i]);
+            backtrack(i + 1);
+            combo.pop();
+        }
+    }
+
+    backtrack(0);
+    return results;
+}
+
+function evaluateFiveCardHand(hand) {
+    const suits = hand.map(c => c.suit);
+    const ranks = hand.map(c => c.rank);
+    const values = hand.map(c => rankValues[c.rank]).sort((a, b) => b - a);
+    const rankCount = {};
+    ranks.forEach(r => rankCount[r] = (rankCount[r] || 0) + 1);
+
+    const isFlush = suits.every(s => s === suits[0]);
+    const isStraight = checkStraight(values);
+
+    // Royal Flush
+    if (isFlush && isStraight && values.includes(14) && values.includes(10)) {
+        return { handValue: 10, bestCards: hand, handType: "Royal Flush", kicker: -1 };
+    }
+
+    // Straight Flush
+    if (isFlush && isStraight) {
+        return { handValue: 9, bestCards: hand, handType: "Straight Flush", kicker: values[0] };
+    }
+
+    // Four of a Kind
+    if (Object.values(rankCount).includes(4)) {
+        const fourRank = Object.keys(rankCount).find(r => rankCount[r] === 4);
+        const kicker = values.find(v => v !== rankValues[fourRank]);
+        return {
+            handValue: 8,
+            bestCards: hand,
+            handType: "Four of a Kind",
+            kicker: kicker
+        };
+    }
+
+    // Full House
+    const hasThree = Object.values(rankCount).includes(3);
+    const hasPair = Object.values(rankCount).filter(v => v >= 2).length >= 2;
+    if (hasThree && hasPair) {
+        return { handValue: 7, bestCards: hand, handType: "Full House", kicker: -1 };
+    }
+
+    // Flush
+    if (isFlush) {
+        return { handValue: 6, bestCards: hand, handType: "Flush", kicker: values[0] };
+    }
+
+    // Straight
+    if (isStraight) {
+        return { handValue: 5, bestCards: hand, handType: "Straight", kicker: values[0] };
+    }
+
+    // Three of a Kind
+    if (Object.values(rankCount).includes(3)) {
+        return { handValue: 4, bestCards: hand, handType: "Three of a Kind", kicker: values[0] };
+    }
+
+    // Two Pair
+    const pairs = Object.entries(rankCount).filter(([r, c]) => c === 2).map(([r]) => rankValues[r]);
+    if (pairs.length === 2) {
+        pairs.sort((a, b) => b - a);
+        const kicker = values.find(v => v !== pairs[0] && v !== pairs[1]);
+        return { handValue: 3, bestCards: hand, handType: "Two Pair", kicker: kicker };
+    }
+
+    // One Pair
+    if (pairs.length === 1) {
+        const kicker = values.find(v => v !== pairs[0]);
+        return { handValue: 2, bestCards: hand, handType: "One Pair", kicker: kicker };
+    }
+
+    // High Card
+    return { handValue: 1, bestCards: hand, handType: "High Card", kicker: values[0] };
+}
+
+function checkStraight(values) {
+    const unique = [...new Set(values)];
+    for (let i = 0; i <= unique.length - 5; i++) {
+        if (unique[i] - unique[i + 4] === 4) return true;
+    }
+    // Check wheel (A-2-3-4-5)
+    if (unique.includes(14) && unique.includes(2) && unique.includes(3) && unique.includes(4) && unique.includes(5)) {
+        return true;
+    }
+    return false;
 }
 
 // Helper functions to check for different hand types
