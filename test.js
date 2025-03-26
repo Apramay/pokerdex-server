@@ -424,14 +424,14 @@ function distributePot(tableId) {
     // ✅ Step 1: Create side pots
     for (let i = 0; i < activePlayers.length; i++) {
         let player = activePlayers[i];
-        let sidePotAmount = (player.currentBet - lastBet) * (activePlayers.length - i);
+        let betAmount = player.currentBet - lastBet;
+        let sidePotAmount = betAmount * (activePlayers.length - i);
 
         if (sidePotAmount > 0) {
             let amount = Math.min(sidePotAmount, remainingPot);
             sidePots.push({
                 amount: amount,
                 eligiblePlayers: activePlayers.slice(i),
-                contributed: activePlayers.slice(i).map(p => p.currentBet || 0) // Safe check
             });
             remainingPot -= amount;
         }
@@ -441,39 +441,29 @@ function distributePot(tableId) {
     // ✅ Step 2: Award side pots proportionally
     sidePots.forEach(sidePot => {
         let winners = determineWinners(sidePot.eligiblePlayers, table);
-        let totalContribution = sidePot.contributed.reduce((sum, c) => sum + c, 0) || 1; // Avoid division by zero
 
+        let splitAmount = Math.floor(sidePot.amount / winners.length); // Split evenly among winners
         winners.forEach(winner => {
-            let winnerShare = sidePot.contributed[sidePot.eligiblePlayers.indexOf(winner)] / totalContribution;
-            let winnings = Math.floor(sidePot.amount * winnerShare);
-            winner.tokens += winnings;
-            console.log(`🏆 ${winner.name} wins ${winnings} from a side pot.`);
+            winner.tokens += splitAmount;
+            console.log(`🏆 ${winner.name} wins ${splitAmount} from a side pot.`);
         });
     });
 
-    // ✅ Step 3: Ensure the main pot is distributed
+    // ✅ Step 3: Distribute remaining main pot
     let mainWinners = determineWinners(activePlayers, table);
-    let totalMainContribution = activePlayers.reduce((sum, p) => sum + (p.currentBet || 0), 0) || 1; // Avoid division by zero
-
+    let splitMainAmount = Math.floor(remainingPot / mainWinners.length);
+    
     mainWinners.forEach(winner => {
-        let winnerShare = winner.currentBet ? (winner.currentBet / totalMainContribution) : 1;
-        let winnings = Math.max(
-            remainingPot > 0 ? Math.floor(remainingPot * winnerShare) : 0,
-            remainingPot
-        ); // Ensure remainingPot is given
-
-        winner.tokens += winnings;
-        console.log(`🏆 ${winner.name} wins ${winnings} from the main pot.`);
-        remainingPot -= winnings; // Reduce the remaining pot
+        winner.tokens += splitMainAmount;
+        console.log(`🏆 ${winner.name} wins ${splitMainAmount} from the main pot.`);
     });
 
-    // ✅ Step 4: Refund excess chips safely
-    let maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet || 0), totalPot);
+    // ✅ Step 4: Refund excess chips properly
     table.players.forEach(player => {
-        if (player.currentBet > maxEffectiveStack) {
-            let refund = player.currentBet - maxEffectiveStack;
+        let maxAllowedBet = Math.min(...table.players.map(p => p.currentBet));
+        if (player.currentBet > maxAllowedBet) {
+            let refund = player.currentBet - maxAllowedBet;
             player.tokens += refund;
-            table.pot -= refund;
             console.log(`💸 ${player.name} gets refunded ${refund} chips.`);
         }
     });
@@ -482,6 +472,7 @@ function distributePot(tableId) {
     table.pot = 0;
     table.sidePots = [];
 }
+
 
 
 function resetGame(tableId) {
