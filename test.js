@@ -506,7 +506,7 @@ function determineWinners(playerList, table) {
     playerList.forEach(player => {
         if (player.status !== "folded") {
             const fullHand = player.hand.concat(table.tableCards);
-            const { handValue, bestCards, kicker } = evaluateHand(fullHand);
+            const { handValue, bestCards, kicker, handType } = evaluateHand(fullHand);
  console.log(`Player ${player.name} evaluated hand:`);
             console.log(`Full Hand: ${JSON.stringify(fullHand.map(card => card.rank + card.suit))}`);
             console.log(`Hand Type: ${handType}`);
