@@ -655,10 +655,19 @@ function evaluateFiveCardHand(hand) {
     }
 
     // One Pair
-    if (pairs.length === 1) {
-        const kicker = values.find(v => v !== pairs[0]);
-        return { handValue: 2, bestCards: hand, handType: "One Pair", kicker: kicker };
-    }
+    // One Pair
+if (pairs.length === 1) {
+    const pairValue = pairs[0];
+    const remaining = values.filter(v => v !== pairValue).slice(0, 3); // Get top 3 kickers
+    return { 
+        handValue: 2, 
+        bestCards: hand, 
+        handType: "One Pair", 
+        kicker: remaining.length > 0 ? remaining[0] : 0, 
+        pairValue: pairValue // Store the value of the pair explicitly
+    };
+}
+
 
     // High Card
     return { handValue: 1, bestCards: hand, handType: "High Card", kicker: values[0] };
@@ -765,6 +774,13 @@ function isOnePair(hand, ranks) {
 function compareHands(handA, handB) {
     const valuesA = handA.map(c => rankValues[c.rank]).sort((a, b) => b - a);
     const valuesB = handB.map(c => rankValues[c.rank]).sort((a, b) => b - a);
+    // If both hands have a pair, compare the pair values first
+    const pairA = valuesA.find((v, _, arr) => arr.filter(x => x === v).length === 2);
+    const pairB = valuesB.find((v, _, arr) => arr.filter(x => x === v).length === 2);
+    if (pairA && pairB) {
+        if (pairA > pairB) return 1;
+        if (pairA < pairB) return -1;
+    }
 
     for (let i = 0; i < 5; i++) {
         if (valuesA[i] > valuesB[i]) return 1;
