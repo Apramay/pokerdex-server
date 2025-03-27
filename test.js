@@ -410,75 +410,57 @@ function showdown(tableId) {
         setTimeout(resetGame, 5000, tableId);
     }
 }
-function distributePot(players, pot, tableCards) {
-  console.log("💰 Distributing the pot...");
+function distributePot(tableId) {
+    const table = tables.get(tableId);
+    if (!table) return;
 
-  // Clone players for evaluation
-  const activePlayers = players
-    .filter(p => p.status !== 'folded')
-    .map(p => ({
-      name: p.name,
-      bet: p.bet,
-      tokens: p.tokens,
-      hand: p.hand,
-      status: p.status
-    }));
+    console.log("💰 Distributing the pot...");
+    const players = table.players.filter(p => p.status === "active" || p.allIn);
 
-  // Evaluate hands and sort by strength
-  activePlayers.forEach(player => {
-    const fullHand = [...player.hand, ...tableCards];
-    const result = evaluateHand(fullHand); // assumes this is defined elsewhere
-    player.handStrength = result.value;
-    player.bestHand = result;
-  });
-
-  activePlayers.sort((a, b) => b.handStrength - a.handStrength);
-
-  // Build side pots based on unique bet levels
-  let sidePots = [];
-  let betLevels = [...new Set(players.map(p => p.bet).filter(b => b > 0))].sort((a, b) => a - b);
-  let prevLevel = 0;
-
-  for (let level of betLevels) {
-    const contributors = players.filter(p => p.bet >= level);
-    const amount = (level - prevLevel) * contributors.length;
-    sidePots.push({
-      amount,
-      contributors: contributors.map(p => p.name)
+    // Evaluate hands once
+    const handStrengthMap = new Map();
+    players.forEach(p => {
+        const fullHand = p.hand.concat(table.tableCards);
+        handStrengthMap.set(p.name, evaluateHand(fullHand));
     });
-    prevLevel = level;
-  }
 
-  // Track total distributed to verify at end
-  let totalDistributed = 0;
+    // Sort players by contribution
+    players.sort((a, b) => a.totalContribution - b.totalContribution);
+    const uniqueLevels = [...new Set(players.map(p => p.totalContribution))].sort((a, b) => a - b);
 
-  // Distribute each side pot
-  for (let sidePot of sidePots) {
-    const contenders = activePlayers.filter(p => sidePot.contributors.includes(p.name));
-    if (contenders.length === 0) continue;
+    let lastLevel = 0;
+    let remainingPot = table.pot;
 
-    const bestHandValue = Math.max(...contenders.map(p => p.handStrength));
-    const winners = contenders.filter(p => p.handStrength === bestHandValue);
+    for (let level of uniqueLevels) {
+        const eligiblePlayers = players.filter(p => p.totalContribution >= level);
+        const potSize = (level - lastLevel) * eligiblePlayers.length;
 
-    const share = Math.floor(sidePot.amount / winners.length);
-    let remainder = sidePot.amount % winners.length;
+        const actualPot = Math.min(remainingPot, potSize);
+        remainingPot -= actualPot;
 
-    winners.forEach(winner => {
-      const bonus = remainder > 0 ? 1 : 0;
-      const payout = share + bonus;
-      remainder -= bonus;
-      const target = players.find(p => p.name === winner.name);
-      target.tokens += payout;
-      totalDistributed += payout;
+        // Determine winner(s) among eligible players
+        const winners = determineWinners(eligiblePlayers, table, handStrengthMap);
 
-      console.log(`🏆 ${winner.name} wins ${payout} from a side pot`);
+        // Calculate even share + leftovers
+        const baseAmount = Math.floor(actualPot / winners.length);
+        let leftover = actualPot % winners.length;
+
+        // Distribute pot
+        winners.forEach((winner, i) => {
+            const share = baseAmount + (i < leftover ? 1 : 0);
+            winner.tokens += share;
+            console.log(`🏆 ${winner.name} wins ${share} from a side pot`);
+        });
+
+        lastLevel = level;
+    }
+
+    // Cleanup
+    table.pot = 0;
+    table.players.forEach(p => {
+        p.currentBet = 0;
+        p.totalContribution = 0;
     });
-  }
-
-  const unaccounted = pot - totalDistributed;
-  if (unaccounted !== 0) {
-    console.warn(`⚠️ Unaccounted chips in pot: ${unaccounted}`);
-  }
 }
 
 function resetGame(tableId) {
