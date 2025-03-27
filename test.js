@@ -981,7 +981,6 @@ function handleCall(data, tableId) {
     const requiredToCall = table.currentBet - player.currentBet;
     const chipsToAdd = Math.min(requiredToCall, player.tokens);
 
-    // Update contributions and pot
     player.tokens -= chipsToAdd;
     player.currentBet += chipsToAdd;
     player.totalContribution += chipsToAdd;
@@ -993,25 +992,30 @@ function handleCall(data, tableId) {
     }
 
     table.playersWhoActed.add(player.name);
+
     broadcast({
         type: "updateActionHistory",
         action: `${data.playerName} called ${chipsToAdd}`
     }, tableId);
 
-    // ✅ Check if all non-folded players are all-in or have no chips
-    const nonFolded = table.players.filter(p => p.status === "active" || p.allIn);
-    const allAllIn = nonFolded.every(p => p.allIn || p.tokens === 0);
+    broadcastGameState(tableId);
 
-    if (allAllIn && table.round >= 2) {
-        console.log("💥 All players are all-in — dealing remaining cards and going to showdown...");
+    // ✅ Check: Only one player can still act (others are all-in or folded)
+    const activeNotAllIn = table.players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
+    const activeOrAllIn = table.players.filter(p => p.status === "active" || p.allIn);
+
+    if (activeNotAllIn.length <= 1 && activeOrAllIn.length > 1) {
+        console.log("🛑 Only one player left who can act — skipping betting and going to showdown.");
+
+        // 🔄 Deal remaining community cards immediately
         while (table.round < 3) {
             nextRound(tableId);
         }
+
         showdown(tableId);
         return;
     }
 
-    // Continue normal flow
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
     if (table.currentPlayerIndex !== -1) {
         bettingRound(tableId);
@@ -1019,8 +1023,6 @@ function handleCall(data, tableId) {
         console.log("✅ All players have acted. Moving to next round.");
         setTimeout(nextRound, 1000, tableId);
     }
-
-    broadcastGameState(tableId);
 }
 
 function handleFold(data, tableId) {
