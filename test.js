@@ -112,18 +112,8 @@ function startNewHand(tableId) {
     let bigBlindIndex = (table.dealerIndex + 2) % table.players.length;
     // Reset player states and deal cards
     table.players.forEach((player, index) => {
-if (player.name === "A") {
-    player.tokens = 500;
-        player.hand = [{ rank: "A", suit: "Hearts" }, { rank: "A", suit: "Spades" }];
-    } else if (player.name === "B") {
-    player.tokens = 700;
-        player.hand = [{ rank: "10", suit: "Clubs" }, { rank: "10", suit: "Diamonds" }];
-    } else if (player.name === "C") {
-    player.tokens = 1000;
-        player.hand = [{ rank: "K", suit: "Hearts" }, { rank: "Q", suit: "Spades" }];
-    } else {
         player.hand = player.tokens > 0 ? dealHand(table.deckForGame, 2) : [];
-    }        player.currentBet = 0;
+           player.currentBet = 0;
         player.totalContribution = 0; // ✅ IMPORTANT
         player.status = player.tokens > 0 ? "active" : "inactive";
         player.isSmallBlind = (activePlayers[smallBlindIndex] && player.name === activePlayers[smallBlindIndex].name);
