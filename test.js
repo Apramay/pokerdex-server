@@ -92,18 +92,19 @@ function startNewHand(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
-    table.resetForNewHand();
-
-    const activePlayers = table.players.filter(p => p.tokens > 0);
-    if (activePlayers.length < 2) {
-        console.log("Not enough players to start a new hand.");
-        return;
-    }
-
+    // Reset key values manually
     table.deck = shuffle(createDeck());
-    table.dealerIndex = (table.dealerIndex + 1) % table.players.length;
+    table.pot = 0;
+    table.currentBet = 0;
+    table.lastRaiseAmount = table.bigBlindAmount;
+    table.round = 0;
+    table.tableCards = [];
+    table.playersWhoActed = new Set();
 
-    // Reset all player states and assign hands
+    // Move dealer button
+    table.dealerIndex = getNextActivePlayerIndex(table.dealerIndex, tableId);
+
+    // Reset player states and deal cards
     for (const player of table.players) {
         player.hand = [table.deck.pop(), table.deck.pop()];
         player.currentBet = 0;
@@ -116,36 +117,32 @@ function startNewHand(tableId) {
     const smallBlindIndex = getNextActivePlayerIndex(table.dealerIndex, tableId);
     const bigBlindIndex = getNextActivePlayerIndex(smallBlindIndex, tableId);
 
-    const smallBlindPlayer = table.players[smallBlindIndex];
-    const bigBlindPlayer = table.players[bigBlindIndex];
+    const sbPlayer = table.players[smallBlindIndex];
+    const bbPlayer = table.players[bigBlindIndex];
 
-    // Post small blind
-    const sbAmount = Math.min(table.smallBlindAmount, smallBlindPlayer.tokens);
-    smallBlindPlayer.tokens -= sbAmount;
-    smallBlindPlayer.currentBet = sbAmount;
-    smallBlindPlayer.totalContribution = sbAmount;
+    const sbAmount = Math.min(table.smallBlindAmount, sbPlayer.tokens);
+    const bbAmount = Math.min(table.bigBlindAmount, bbPlayer.tokens);
 
-    // Post big blind
-    const bbAmount = Math.min(table.bigBlindAmount, bigBlindPlayer.tokens);
-    bigBlindPlayer.tokens -= bbAmount;
-    bigBlindPlayer.currentBet = bbAmount;
-    bigBlindPlayer.totalContribution = bbAmount;
+    sbPlayer.tokens -= sbAmount;
+    sbPlayer.currentBet = sbAmount;
+    sbPlayer.totalContribution = sbAmount;
 
-    // Update table pot and current bet
+    bbPlayer.tokens -= bbAmount;
+    bbPlayer.currentBet = bbAmount;
+    bbPlayer.totalContribution = bbAmount;
+
     table.pot = sbAmount + bbAmount;
     table.currentBet = bbAmount;
-    table.lastRaiseAmount = table.bigBlindAmount;
 
-    // Mark blind posters as having acted
-    table.playersWhoActed.clear();
-    if (sbAmount > 0) table.playersWhoActed.add(smallBlindPlayer.name);
-    if (bbAmount > 0) table.playersWhoActed.add(bigBlindPlayer.name);
+    // Blinds are considered to have acted
+    if (sbAmount > 0) table.playersWhoActed.add(sbPlayer.name);
+    if (bbAmount > 0) table.playersWhoActed.add(bbPlayer.name);
 
-    // Set current player (first to act = UTG, after BB)
+    // Set action to first player after BB
     table.currentPlayerIndex = getNextActivePlayerIndex(bigBlindIndex, tableId);
 
     console.log(`🎲 New dealer is: ${table.players[table.dealerIndex].name}`);
-    console.log(`💰 Blinds posted: SB ${smallBlindPlayer.name} (${sbAmount}), BB ${bigBlindPlayer.name} (${bbAmount})`);
+    console.log(`💰 Blinds posted: SB ${sbPlayer.name} (${sbAmount}), BB ${bbPlayer.name} (${bbAmount})`);
     console.log(`🎯 Starting action with: ${table.players[table.currentPlayerIndex].name}`);
 
     broadcastGameState(tableId);
