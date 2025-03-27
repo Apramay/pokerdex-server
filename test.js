@@ -903,32 +903,32 @@ function handleRaise(data, tableId) {
     const raiseAmount = parseInt(data.amount);
     const minRaise = table.lastRaiseAmount || table.bigBlindAmount;
 
-    const requiredToCall = table.currentBet - player.currentBet;
-    const newTotalBet = table.currentBet + raiseAmount;
-    const chipsToAdd = requiredToCall + raiseAmount;
-
     if (raiseAmount < minRaise && raiseAmount !== player.tokens) {
         console.log(`❌ ${player.name} must raise by at least ${minRaise}`);
         return;
     }
 
-    // Cap to player's remaining tokens (all-in)
-    const actualChips = Math.min(chipsToAdd, player.tokens);
-    player.tokens -= actualChips;
-    player.currentBet += actualChips;
-    player.totalContribution += actualChips;
-    table.pot += actualChips;
+    const requiredToCall = Math.max(table.currentBet - player.currentBet, 0);
+    const totalBet = requiredToCall + raiseAmount;
+    const chipsToAdd = Math.min(totalBet, player.tokens);
+
+    player.tokens -= chipsToAdd;
+    player.currentBet += chipsToAdd;
+    player.totalContribution += chipsToAdd;
+    table.pot += chipsToAdd;
 
     if (player.tokens === 0) {
         player.allIn = true;
     }
 
-    table.currentBet = player.currentBet;
+    table.currentBet = Math.max(table.currentBet, player.currentBet);
     table.lastRaiseAmount = raiseAmount;
     table.playersWhoActed.clear();
     table.playersWhoActed.add(player.name);
 
     console.log(`${player.name} raises to ${player.currentBet}`);
+    console.log(`💸 Contributions: ${table.players.map(p => `${p.name}:${p.totalContribution}`).join(", ")}`);
+
     broadcast({
         type: "updateActionHistory",
         action: `${data.playerName} raised to ${player.currentBet}`
