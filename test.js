@@ -896,41 +896,42 @@ wss.on('connection', function connection(ws) {
 function handleRaise(data, tableId) {
     const table = tables.get(tableId);
     if (!table) return;
-    
+
     const player = table.players.find(p => p.name === data.playerName);
     if (!player) return;
-    
-    let raiseAmount = parseInt(data.amount);
-    // MODIFIED: Enforce minimum raise unless going all-in
+
+    const raiseAmount = parseInt(data.amount);
     const minRaise = table.lastRaiseAmount || table.bigBlindAmount;
+
     if (raiseAmount < minRaise && raiseAmount !== player.tokens) {
         console.log(`❌ ${player.name} must raise by at least ${minRaise}`);
         return;
     }
 
-    const totalBet = player.currentBet + raiseAmount;
-    player.tokens -= raiseAmount;
-    table.pot += raiseAmount;
-    player.currentBet = totalBet;
-    player.totalContribution += raiseAmount; // MODIFIED: Track total contribution
-    
+    const newTotalBet = player.currentBet + raiseAmount;
+    const chipsToAdd = newTotalBet - player.currentBet;
+
+    // Deduct tokens and update contributions
+    player.tokens -= chipsToAdd;
+    player.currentBet = newTotalBet;
+    player.totalContribution += chipsToAdd;
+    table.pot += chipsToAdd;
+
     if (player.tokens === 0) {
         player.allIn = true;
     }
-    
-    console.log(`${player.name} raises to ${totalBet}`);
-    
-    // Original broadcast and logging remains
-    table.currentBet = totalBet;
-    table.lastRaiseAmount = raiseAmount; // MODIFIED: Track last raise amount
+
+    table.currentBet = newTotalBet;
+    table.lastRaiseAmount = raiseAmount;
     table.playersWhoActed.clear();
     table.playersWhoActed.add(player.name);
-    
+
+    console.log(`${player.name} raises to ${newTotalBet}`);
     broadcast({
         type: "updateActionHistory",
-        action: `${data.playerName} raised to ${totalBet}`
+        action: `${data.playerName} raised to ${newTotalBet}`
     }, tableId);
-    
+
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
     broadcastGameState(tableId);
     bettingRound(tableId);
@@ -980,41 +981,27 @@ function handleCall(data, tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
-    console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
-    console.log("Before updating playersWhoActed:", [...table.playersWhoActed]);
-
     const player = table.players.find(p => p.name === data.playerName);
-    if (!player) {
-        console.error("Player not found:", data.playerName);
-        return;
-    }
+    if (!player) return;
 
-    const callAmount = table.currentBet - player.currentBet;
-    // MODIFIED: Better all-in handling
-    if (callAmount >= player.tokens) {
-        // Player goes all-in
+    const requiredToCall = table.currentBet - player.currentBet;
+    const chipsToAdd = Math.min(requiredToCall, player.tokens);
+
+    // Update contributions and pot
+    player.tokens -= chipsToAdd;
+    player.currentBet += chipsToAdd;
+    player.totalContribution += chipsToAdd;
+    table.pot += chipsToAdd;
+
+    if (player.tokens === 0) {
         player.allIn = true;
-        const allInAmount = player.tokens;
-        player.tokens = 0;
-        player.currentBet += allInAmount;
-        player.totalContribution += allInAmount;
-        table.pot += allInAmount;
-        console.log(`💥 ${player.name} goes all-in for ${allInAmount}`);
-    } else {
-        // Normal call
-        player.tokens -= callAmount;
-        player.currentBet = table.currentBet;
-        player.totalContribution += callAmount;
-        table.pot += callAmount;
+        console.log(`💥 ${player.name} goes all-in for ${chipsToAdd}`);
     }
 
-    // Original logging and broadcast remains
     table.playersWhoActed.add(player.name);
-    console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
-
     broadcast({
         type: "updateActionHistory",
-        action: `${data.playerName} called ${Math.min(callAmount, player.tokens + callAmount)}`
+        action: `${data.playerName} called ${chipsToAdd}`
     }, tableId);
 
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
@@ -1024,8 +1011,10 @@ function handleCall(data, tableId) {
         console.log("✅ All players have acted. Moving to next round.");
         setTimeout(nextRound, 1000, tableId);
     }
+
     broadcastGameState(tableId);
 }
+
 
 function handleFold(data, tableId) {
 const table = tables.get(tableId);
