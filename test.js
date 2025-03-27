@@ -360,80 +360,124 @@ const manualTurn = { suit: "Clubs", rank: "9" };
 const manualRiver = { suit: "Hearts", rank: "3" };
 
 function showdown(tableId) {
-  const table = tables[tableId];
-  if (!table) return;
+    const table = tables.get(tableId);
+    if (!table) return;
 
-  const playersInShowdown = table.players.filter(p => p.status !== 'folded');
-
-  if (playersInShowdown.length === 1) {
-    const winner = playersInShowdown[0];
-    console.log(`🏆 ${winner.name} wins uncontested!`);
-    winner.tokens += table.pot;
-    table.pot = 0;
-    return;
-  }
-
-  console.log(`🏆  Showdown!`);
-
-  // Evaluate hands
-  for (const player of playersInShowdown) {
-    const fullHand = [...player.hand, ...table.tableCards];
-    const result = evaluateHand(fullHand);
-    player.handRank = result;
-    console.log(`Player ${player.name} evaluated hand:`);
-    console.log(`Full Hand: ${JSON.stringify(fullHand.map(c => c.rank + c.suit))}`);
-    console.log(`Hand Type: ${result.name}`);
-    console.log(`Hand Value: ${result.value}`);
-    console.log(`Best Cards: ${JSON.stringify(result.bestCards.map(c => c.rank + c.suit))}`);
-    console.log(`Kicker: ${result.kicker}`);
-  }
-
-  distributePot(table.players, table.pot, table.tableCards);
-  table.pot = 0;
-}
-
-function distributePot(players, totalPot, tableCards) {
-  console.log('💰 Distributing the pot...');
-  let pot = totalPot;
-
-  // Sort players by bet amount to determine side pots
-  let allIns = players
-    .filter(p => p.status !== 'folded' && p.totalBet > 0)
-    .sort((a, b) => a.totalBet - b.totalBet);
-
-  const sidePots = [];
-  let prev = 0;
-
-  while (allIns.length > 0) {
-    const currBet = allIns[0].totalBet;
-    const eligible = players.filter(p => p.status !== 'folded' && p.totalBet >= currBet);
-
-    const potAmount = (currBet - prev) * eligible.length;
-    sidePots.push({
-      amount: potAmount,
-      players: [...eligible],
+    console.log(" 🏆  Showdown!");
+    let activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
+    let winners = determineWinners(activePlayers, table);
+    winners.forEach(winner => {
+        console.log(` 🎉  ${winner.name} wins the hand!`);
     });
+    //  ✅  Automatically reveal the winner's hand
+        let revealedHands = winners.map(winner => {
+        const fullHand = winner.hand.concat(table.tableCards);
+        const evalResult = evaluateHand(fullHand); // ✅ Store the result first
 
-    prev = currBet;
-    allIns = allIns.filter(p => p.totalBet > currBet);
+        return {
+            playerName: winner.name,
+            hand: evalResult.bestCards, // ✅ Extract best cards
+            handType: evalResult.handType // ✅ Extract handType properly
+        };
+    });
+    //  ✅  Broadcast revealed winner hands to all players
+    broadcast({
+        type: "showdown",
+        winners: revealedHands,
+    }, tableId);
+    //  ✅  Record winning hand in history
+    broadcast({
+        type: "updateActionHistory",
+        action: `🏆  Winner: ${winners.map(w => w.name).join(", ")} with ${revealedHands[0].handType}`
+    }, tableId);
+    distributePot(tableId);
+    //  ✅  Give players the option to "Show" or "Hide" their hands
+    let remainingPlayers = activePlayers.filter(p => !winners.includes(p)).map(p => p.name);
+    if (remainingPlayers.length > 0) {
+        broadcast({
+            type: "showOrHideCards",
+            remainingPlayers
+        }, tableId);
+        //  ✅  Auto-start next hand if no action in 10 seconds
+        setTimeout(() => {
+            if (remainingPlayers.length > 0) {
+                console.log(" ⏳  No player responded. Automatically starting the next hand...");
+                resetGame(tableId);
+            }
+
+        }, 10000); // 10 seconds
+    } else {
+        setTimeout(resetGame, 5000, tableId);
+    }
+}
+function distributePot(players, pot, tableCards) {
+  console.log("💰 Distributing the pot...");
+
+  // Clone players for evaluation
+  const activePlayers = players
+    .filter(p => p.status !== 'folded')
+    .map(p => ({
+      name: p.name,
+      bet: p.bet,
+      tokens: p.tokens,
+      hand: p.hand,
+      status: p.status
+    }));
+
+  // Evaluate hands and sort by strength
+  activePlayers.forEach(player => {
+    const fullHand = [...player.hand, ...tableCards];
+    const result = evaluateHand(fullHand); // assumes this is defined elsewhere
+    player.handStrength = result.value;
+    player.bestHand = result;
+  });
+
+  activePlayers.sort((a, b) => b.handStrength - a.handStrength);
+
+  // Build side pots based on unique bet levels
+  let sidePots = [];
+  let betLevels = [...new Set(players.map(p => p.bet).filter(b => b > 0))].sort((a, b) => a - b);
+  let prevLevel = 0;
+
+  for (let level of betLevels) {
+    const contributors = players.filter(p => p.bet >= level);
+    const amount = (level - prevLevel) * contributors.length;
+    sidePots.push({
+      amount,
+      contributors: contributors.map(p => p.name)
+    });
+    prevLevel = level;
   }
 
-  for (const [i, sidePot] of sidePots.entries()) {
-    const contenders = sidePot.players.filter(p => p.status !== 'folded');
-    const bestHand = getBestHand(contenders, tableCards);
-    const winners = contenders.filter(p => compareHands(p.handRank, bestHand.hand) === 0);
+  // Track total distributed to verify at end
+  let totalDistributed = 0;
+
+  // Distribute each side pot
+  for (let sidePot of sidePots) {
+    const contenders = activePlayers.filter(p => sidePot.contributors.includes(p.name));
+    if (contenders.length === 0) continue;
+
+    const bestHandValue = Math.max(...contenders.map(p => p.handStrength));
+    const winners = contenders.filter(p => p.handStrength === bestHandValue);
 
     const share = Math.floor(sidePot.amount / winners.length);
-    for (const winner of winners) {
-      winner.tokens += share;
-      console.log(`🏆 ${winner.name} wins ${share} from a side pot`);
-    }
+    let remainder = sidePot.amount % winners.length;
 
-    pot -= share * winners.length;
+    winners.forEach(winner => {
+      const bonus = remainder > 0 ? 1 : 0;
+      const payout = share + bonus;
+      remainder -= bonus;
+      const target = players.find(p => p.name === winner.name);
+      target.tokens += payout;
+      totalDistributed += payout;
+
+      console.log(`🏆 ${winner.name} wins ${payout} from a side pot`);
+    });
   }
 
-  if (pot > 0) {
-    console.log(`⚠️ Undistributed chips remaining: ${pot}`);
+  const unaccounted = pot - totalDistributed;
+  if (unaccounted !== 0) {
+    console.warn(`⚠️ Unaccounted chips in pot: ${unaccounted}`);
   }
 }
 
@@ -469,7 +513,7 @@ function resetGame(tableId) {
     console.log(` 🎲  New dealer is: ${table.players[table.dealerIndex].name}`);
     startNewHand(tableId); //  ✅  Start the new round with correct dealer
 }
-function determineWinners(playerList, table, handCache = new Map()) {
+function determineWinners(playerList, table) {
     if (playerList.length === 0) return [];
 
     let bestHandValue = -1;
@@ -479,14 +523,11 @@ function determineWinners(playerList, table, handCache = new Map()) {
     playerList.forEach(player => {
         if (player.status === "folded") return;
 
-        let evalResult = handCache.has(player.name)
-            ? handCache.get(player.name)
-            : evaluateHand(player.hand.concat(table.tableCards));
-
-        const { handValue, bestCards, kicker, handType } = evalResult;
+        const fullHand = player.hand.concat(table.tableCards);
+        const { handValue, bestCards, kicker, handType } = evaluateHand(fullHand);
 
         console.log(`Player ${player.name} evaluated hand:`);
-        console.log(`Full Hand: ${JSON.stringify(player.hand.concat(table.tableCards).map(card => card.rank + card.suit))}`);
+        console.log(`Full Hand: ${JSON.stringify(fullHand.map(card => card.rank + card.suit))}`);
         console.log(`Hand Type: ${handType}`);
         console.log(`Hand Value: ${handValue}`);
         console.log(`Best Cards: ${JSON.stringify(bestCards.map(card => card.rank + card.suit))}`);
