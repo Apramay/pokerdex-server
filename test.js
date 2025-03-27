@@ -417,20 +417,19 @@ function distributePot(tableId) {
     console.log("💰 Distributing the pot...");
     const players = table.players.filter(p => p.status === "active" || p.allIn);
 
-    // ✅ Cache evaluations
+    // 🧠 Cache evaluated hands
     const handStrengthMap = new Map();
     players.forEach(p => {
         const fullHand = p.hand.concat(table.tableCards);
         handStrengthMap.set(p.name, evaluateHand(fullHand));
     });
 
-    // ✅ Sort players and get contribution tiers
+    // 🔢 Sort contributions & determine tiers
     players.sort((a, b) => a.totalContribution - b.totalContribution);
     const sidePotLevels = [...new Set(players.map(p => p.totalContribution))].sort((a, b) => a - b);
 
     let lastLevel = 0;
     let remainingPot = table.pot;
-    let lastWinners = [];
 
     for (let level of sidePotLevels) {
         const eligiblePlayers = players.filter(p => p.totalContribution >= level);
@@ -438,28 +437,24 @@ function distributePot(tableId) {
         const distributeAmount = Math.min(potSize, remainingPot);
 
         const winners = determineWinners(eligiblePlayers, table, handStrengthMap);
-        const winAmount = Math.floor(distributeAmount / winners.length);
+        const baseWin = Math.floor(distributeAmount / winners.length);
+        let leftover = distributeAmount - (baseWin * winners.length);
 
-        winners.forEach(winner => {
-            winner.tokens += winAmount;
-            console.log(`🏆 ${winner.name} wins ${winAmount} from a side pot`);
+        winners.forEach((winner, i) => {
+            let payout = baseWin;
+            if (leftover > 0) {
+                payout += 1;
+                leftover -= 1;
+            }
+            winner.tokens += payout;
+            console.log(`🏆 ${winner.name} wins ${payout} from a side pot`);
         });
 
         remainingPot -= distributeAmount;
         lastLevel = level;
-        lastWinners = winners; // ✅ Store actual last winners, not just eligible players
     }
 
-    // ✅ Distribute leftover chips to actual last winners only
-    if (remainingPot > 0 && lastWinners.length > 0) {
-        for (const winner of lastWinners) {
-            if (remainingPot <= 0) break;
-            winner.tokens += 1;
-            remainingPot -= 1;
-        }
-    }
-
-    // ✅ Reset
+    // 🧼 Reset
     table.pot = 0;
     table.players.forEach(p => {
         p.currentBet = 0;
