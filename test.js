@@ -416,9 +416,18 @@ function distributePot(tableId) {
 
     console.log("💰 Distributing the pot...");
     let players = table.players.filter(p => p.status === "active" || p.allIn);
-    players.sort((a, b) => a.totalContribution - b.totalContribution);
 
+    // ✅ Evaluate hands once and cache
+    const handStrengthMap = new Map();
+    players.forEach(p => {
+        const fullHand = p.hand.concat(table.tableCards);
+        handStrengthMap.set(p.name, evaluateHand(fullHand));
+    });
+
+    // ✅ Sort players by their contribution size
+    players.sort((a, b) => a.totalContribution - b.totalContribution);
     let sidePotLevels = [...new Set(players.map(p => p.totalContribution))].sort((a, b) => a - b);
+
     let lastLevel = 0;
     let remainingPot = table.pot;
 
@@ -426,8 +435,9 @@ function distributePot(tableId) {
         let eligiblePlayers = players.filter(p => p.totalContribution >= level);
         let potSize = (level - lastLevel) * eligiblePlayers.length;
         let distributeAmount = Math.min(potSize, remainingPot);
-        let winners = determineWinners(eligiblePlayers, table);
-        let winAmount = Math.floor(distributeAmount / winners.length);
+
+        const winners = determineWinners(eligiblePlayers, table, handStrengthMap);
+        const winAmount = Math.floor(distributeAmount / winners.length);
 
         winners.forEach(winner => {
             winner.tokens += winAmount;
@@ -438,24 +448,23 @@ function distributePot(tableId) {
         lastLevel = level;
     }
 
-    // Distribute any leftover chips (due to floor rounding) to top winner(s)
+    // ✅ Distribute leftover chips (if any) to final winners
     if (remainingPot > 0) {
-        let finalWinners = determineWinners(players, table);
-        finalWinners.forEach(winner => {
+        const finalWinners = determineWinners(players, table, handStrengthMap);
+        for (let winner of finalWinners) {
+            if (remainingPot <= 0) break;
             winner.tokens += 1;
             remainingPot -= 1;
-            if (remainingPot <= 0) return;
-        });
+        }
     }
 
+    // ✅ Reset pot & contributions
     table.pot = 0;
     table.players.forEach(p => {
         p.currentBet = 0;
         p.totalContribution = 0;
     });
 }
-
-
 
 function resetGame(tableId) {
     const table = tables.get(tableId);
@@ -489,7 +498,7 @@ function resetGame(tableId) {
     console.log(` 🎲  New dealer is: ${table.players[table.dealerIndex].name}`);
     startNewHand(tableId); //  ✅  Start the new round with correct dealer
 }
-function determineWinners(playerList, table) {
+function determineWinners(playerList, table, handCache = new Map()) {
     if (playerList.length === 0) return [];
 
     let bestHandValue = -1;
@@ -499,11 +508,14 @@ function determineWinners(playerList, table) {
     playerList.forEach(player => {
         if (player.status === "folded") return;
 
-        const fullHand = player.hand.concat(table.tableCards);
-        const { handValue, bestCards, kicker, handType } = evaluateHand(fullHand);
+        let evalResult = handCache.has(player.name)
+            ? handCache.get(player.name)
+            : evaluateHand(player.hand.concat(table.tableCards));
+
+        const { handValue, bestCards, kicker, handType } = evalResult;
 
         console.log(`Player ${player.name} evaluated hand:`);
-        console.log(`Full Hand: ${JSON.stringify(fullHand.map(card => card.rank + card.suit))}`);
+        console.log(`Full Hand: ${JSON.stringify(player.hand.concat(table.tableCards).map(card => card.rank + card.suit))}`);
         console.log(`Hand Type: ${handType}`);
         console.log(`Hand Value: ${handValue}`);
         console.log(`Best Cards: ${JSON.stringify(bestCards.map(card => card.rank + card.suit))}`);
