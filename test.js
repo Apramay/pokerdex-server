@@ -88,66 +88,58 @@ function startGame(tableId) {
     broadcastGameState(tableId); 
 }
 // Function to start a new hand
-function startNewHand(table) {
-  table.resetForNewHand();
+function startNewHand(tableId) {
+    const table = tables.get(tableId);
+    if (!table) return;
+    // Reset game state for a new hand
+    table.tableCards = []; 
+    table.pot = 0;
+    table.currentBet = 0;
+    table.playersWhoActed.clear();
+    table.deckForGame = shuffleDeck(createDeck());
+    table.round = 0;
+    table.lastRaiseAmount = 0;
+    // Reset to preflop
+    // Move the dealer button
+    let activePlayers = table.players.filter(p => p.tokens > 0);
+    if (activePlayers.length === 0) {
+        console.log(" ⚠️ No active players left! Game cannot continue.");
+        return;
+    }
+    table.dealerIndex = (table.dealerIndex + 1) % table.players.length;
+    // Determine small blind and big blind indices
+    let smallBlindIndex = (table.dealerIndex + 1) % table.players.length;
+    let bigBlindIndex = (table.dealerIndex + 2) % table.players.length;
+    // Reset player states and deal cards
+    table.players.forEach((player, index) => {
+if (player.name === "A") {
+    player.tokens = 500;
+        player.hand = [{ rank: "A", suit: "Hearts" }, { rank: "A", suit: "Spades" }];
+    } else if (player.name === "B") {
+    player.tokens = 700;
+        player.hand = [{ rank: "10", suit: "Clubs" }, { rank: "10", suit: "Diamonds" }];
+    } else if (player.name === "C") {
+    player.tokens = 1000;
+        player.hand = [{ rank: "K", suit: "Hearts" }, { rank: "Q", suit: "Spades" }];
+    } else {
+        player.hand = player.tokens > 0 ? dealHand(table.deckForGame, 2) : [];
+    }        player.currentBet = 0;
+        player.totalContribution = 0; // ✅ IMPORTANT
+        player.status = player.tokens > 0 ? "active" : "inactive";
+        player.isSmallBlind = (activePlayers[smallBlindIndex] && player.name === activePlayers[smallBlindIndex].name);
+        player.isBigBlind = (activePlayers[bigBlindIndex] && player.name === activePlayers[bigBlindIndex].name);
+       const blindAmount = player.isSmallBlind ? table.smallBlindAmount : player.isBigBlind ? table.bigBlindAmount : 0;
 
-  // Shuffle the deck and deal two cards to each player
-  const deck = createShuffledDeck();
-  table.deck = deck;
-  for (let player of table.players) {
-    player.hand = [deck.pop(), deck.pop()];
-    player.folded = false;
-    player.allIn = false;
-    player.currentBet = 0;
-    player.totalContribution = 0;
-    player.status = 'active';
-  }
-
-  table.currentBet = 0;
-  table.pot = 0;
-  table.sidePots = [];
-  table.tableCards = [];
-  table.round = 0;
-  table.playersWhoActed = new Set();
-
-  // Rotate dealer
-  table.dealerIndex = (table.dealerIndex + 1) % table.players.length;
-  const smallBlindIndex = (table.dealerIndex + 1) % table.players.length;
-  const bigBlindIndex = (table.dealerIndex + 2) % table.players.length;
-
-  const smallBlindPlayer = table.players[smallBlindIndex];
-  const bigBlindPlayer = table.players[bigBlindIndex];
-
-  const smallBlind = table.smallBlind;
-  const bigBlind = table.bigBlind;
-
-  // Post small blind
-  smallBlindPlayer.tokens -= smallBlind;
-  smallBlindPlayer.currentBet = smallBlind;
-  smallBlindPlayer.totalContribution = smallBlind;
-  table.playersWhoActed.add(smallBlindPlayer.name);
-
-  // Post big blind
-  bigBlindPlayer.tokens -= bigBlind;
-  bigBlindPlayer.currentBet = bigBlind;
-  bigBlindPlayer.totalContribution = bigBlind;
-  table.playersWhoActed.add(bigBlindPlayer.name);
-
-  table.currentBet = bigBlind;
-
-  broadcast(table, {
-    type: 'handStarted',
-    dealer: table.players[table.dealerIndex].name,
-    smallBlind: smallBlindPlayer.name,
-    bigBlind: bigBlindPlayer.name,
-    players: table.players.map((p) => ({
-      name: p.name,
-      tokens: p.tokens,
-    })),
-  });
-
-  dealToPlayers(table);
-  startBettingRound(table, (bigBlindIndex + 1) % table.players.length);
+        player.tokens -= blindAmount;
+        player.currentBet = blindAmount;
+        player.totalContribution = blindAmount; // ✅ Fix: Incorporate blinds into totalContribution
+        table.pot += blindAmount;
+    });
+    table.currentBet = table.bigBlindAmount;
+    // Set the starting player (after the big blind)
+    table.currentPlayerIndex = (bigBlindIndex + 1) % table.players.length;
+    // Broadcast the updated game state
+    broadcastGameState(tableId);
 }
 
 function setupBlinds(tableId) {
