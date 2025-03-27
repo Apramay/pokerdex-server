@@ -10,33 +10,35 @@ const wss = new WebSocket.Server({ server });
 // Store game state for each table
 const tables = new Map();
 
-// Helper functions
+// Card and game constants
+const suits = ["Hearts", "Diamonds", "Clubs", "Spades"];
+const ranks = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"]; 
+const rankValues = {
+    "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "J": 11, "Q": 12, "K": 13, "A": 14
+}; 
+ let players = [];
+ let tableCards = [];
+let pot = 0;
+let currentPlayerIndex = 0;
+let deckForGame = [];
+let currentBet = 0;
+let dealerIndex = 0;
+let round = 0;
+let smallBlindAmount = 10;
+let bigBlindAmount = 20;
+let lastRaiseAmount = 0;
+let playersWhoActed = new Set();
+// Function to create a new deck of cards
 function createDeck() {
     let deck = [];
-    for (const suit of suits) {
-        for (const rank of ranks) {
+    suits.forEach(suit => {
+        ranks.forEach(rank => {
             deck.push({ suit, rank });
-        }
-    }
-    return shuffleDeck(deck);
+        });
+    }); 
+    return deck.sort(() => Math.random() - 0.5); 
 }
-
-function shuffleDeck(deck) {
-    for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-    return deck;
-}
-
-function dealHand(deck, numCards) {
-    const hand = [];
-    for (let i = 0; i < numCards; i++) {
-        hand.push(deck.pop());
-    }
-    return hand;
-}
-
+// Function to broadcast data to all connected clients
 function broadcast(data, tableId) {
     const jsonData = JSON.stringify(data);
     wss.clients.forEach(client => {
@@ -45,7 +47,7 @@ function broadcast(data, tableId) {
         }
     });
 }
-
+// Function to broadcast the current game state to all clients
 function broadcastGameState(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
@@ -53,351 +55,490 @@ function broadcastGameState(tableId) {
     table.players.forEach(player => {
         const privateGameState = {
             type: "updateGameState",
-            tableId: tableId,
-            players: table.players.map(p => ({
-                ...p,
-                hand: p.name === player.name ? p.hand : 
-                      p.hand.map(() => ({ rank: "back", suit: "back" }))
+            tableId: tableId, 
+            players: table.players.map(({ ws, hand, ...playerData }) => ({
+                ...playerData,
+                hand: player.name === playerData.name ? hand
+                    : Array(hand.length).fill({ rank: "back", suit: "back" })
             })),
             tableCards: table.tableCards,
             pot: table.pot,
             currentBet: table.currentBet,
             round: table.round,
             currentPlayerIndex: table.currentPlayerIndex,
-            dealerIndex: table.dealerIndex,
-            lastRaiseAmount: table.lastRaiseAmount
+            dealerIndex: table.dealerIndex
         };
 
         if (player.ws.readyState === WebSocket.OPEN) {
             player.ws.send(JSON.stringify(privateGameState));
         }
-    });
+    }); 
 }
-
-// Game logic
+// Function to start the game
 function startGame(tableId) {
     const table = tables.get(tableId);
     if (!table || table.players.length < 2) {
-        console.log("Not enough players to start the game");
+        console.log(" ❌  Not enough players to start the game.");
         return;
     }
-
-    table.deckForGame = createDeck();
+    table.deckForGame = shuffleDeck(createDeck());
     table.dealerIndex = Math.floor(Math.random() * table.players.length);
     startNewHand(tableId);
+    broadcast({ type: "startGame" }, tableId);
+    broadcastGameState(tableId); 
 }
-
+// Function to start a new hand
 function startNewHand(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
-
-    // Reset hand-specific state
-    table.tableCards = [];
+    // Reset game state for a new hand
+    table.tableCards = []; 
     table.pot = 0;
     table.currentBet = 0;
+    table.playersWhoActed.clear();
+    table.deckForGame = shuffleDeck(createDeck());
+    table.round = 0;
     table.lastRaiseAmount = 0;
-    table.playersWhoActed = new Set();
-    table.round = 0; // Pre-flop
-    table.deckForGame = createDeck();
-
-    // Move dealer button
+    // Reset to preflop
+    // Move the dealer button
+    let activePlayers = table.players.filter(p => p.tokens > 0);
+    if (activePlayers.length === 0) {
+        console.log(" ⚠️ No active players left! Game cannot continue.");
+        return;
+    }
     table.dealerIndex = (table.dealerIndex + 1) % table.players.length;
-
-    // Reset player states
-    table.players.forEach(player => {
-        player.hand = [];
-        player.currentBet = 0;
-        player.totalContribution = 0;
-        player.allIn = false;
+    // Determine small blind and big blind indices
+    let smallBlindIndex = (table.dealerIndex + 1) % table.players.length;
+    let bigBlindIndex = (table.dealerIndex + 2) % table.players.length;
+    // Reset player states and deal cards
+    table.players.forEach((player, index) => {
+if (player.name === "A") {
+    player.tokens = 500;
+        player.hand = [{ rank: "A", suit: "Hearts" }, { rank: "A", suit: "Spades" }];
+    } else if (player.name === "B") {
+    player.tokens = 700;
+        player.hand = [{ rank: "10", suit: "Clubs" }, { rank: "10", suit: "Diamonds" }];
+    } else if (player.name === "C") {
+    player.tokens = 1000;
+        player.hand = [{ rank: "K", suit: "Hearts" }, { rank: "Q", suit: "Spades" }];
+    } else {
+        player.hand = player.tokens > 0 ? dealHand(table.deckForGame, 2) : [];
+    }        player.currentBet = 0;
         player.status = player.tokens > 0 ? "active" : "inactive";
-    });
+        player.isSmallBlind = (activePlayers[smallBlindIndex] && player.name === activePlayers[smallBlindIndex].name);
+        player.isBigBlind = (activePlayers[bigBlindIndex] && player.name === activePlayers[bigBlindIndex].name);
+        player.tokens -= player.isSmallBlind ? table.smallBlindAmount : player.isBigBlind ? table.bigBlindAmount : 0;
 
-    // Deal cards to active players
-    table.players.forEach(player => {
-        if (player.tokens > 0) {
-            // For testing, give specific hands
-            if (player.name === "A") {
-                player.hand = [{ rank: "A", suit: "Hearts" }, { rank: "A", suit: "Spades" }];
-                player.tokens = 500;
-            } else if (player.name === "B") {
-                player.hand = [{ rank: "10", suit: "Clubs" }, { rank: "10", suit: "Diamonds" }];
-                player.tokens = 700;
-            } else if (player.name === "C") {
-                player.hand = [{ rank: "K", suit: "Hearts" }, { rank: "Q", suit: "Spades" }];
-                player.tokens = 1000;
-            } else {
-                player.hand = dealHand(table.deckForGame, 2);
-            }
-        }
+        table.pot += player.isSmallBlind ? table.smallBlindAmount : player.isBigBlind ? table.bigBlindAmount : 0;
+        player.currentBet = player.isSmallBlind ? table.smallBlindAmount : player.isBigBlind ? table.bigBlindAmount : 0;
     });
-
-    // Post blinds
-    setupBlinds(tableId);
+    table.currentBet = table.bigBlindAmount;
+    // Set the starting player (after the big blind)
+    table.currentPlayerIndex = (bigBlindIndex + 1) % table.players.length;
+    // Broadcast the updated game state
+    broadcastGameState(tableId);
 }
 
 function setupBlinds(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
+    table.pot = 0; 
     const smallBlindIndex = (table.dealerIndex + 1) % table.players.length;
     const bigBlindIndex = (table.dealerIndex + 2) % table.players.length;
-
-    // Post small blind
-    const sbPlayer = table.players[smallBlindIndex];
-    if (sbPlayer && sbPlayer.tokens > 0) {
-        const sbAmount = Math.min(table.smallBlindAmount, sbPlayer.tokens);
-        sbPlayer.tokens -= sbAmount;
-        sbPlayer.currentBet = sbAmount;
-        sbPlayer.totalContribution += sbAmount;
-        table.pot += sbAmount;
-        sbPlayer.isSmallBlind = true;
-        if (sbPlayer.tokens === 0) sbPlayer.allIn = true;
-    }
-
-    // Post big blind
-    const bbPlayer = table.players[bigBlindIndex];
-    if (bbPlayer && bbPlayer.tokens > 0) {
-        const bbAmount = Math.min(table.bigBlindAmount, bbPlayer.tokens);
-        bbPlayer.tokens -= bbAmount;
-        bbPlayer.currentBet = bbAmount;
-        bbPlayer.totalContribution += bbAmount;
-        table.pot += bbAmount;
-        table.currentBet = bbAmount;
-        table.lastRaiseAmount = bbAmount;
-        bbPlayer.isBigBlind = true;
-        if (bbPlayer.tokens === 0) bbPlayer.allIn = true;
-    }
-
-    // Set first player to act (UTG)
+    console.log(` 🎲  Setting up blinds: SB -> ${table.players[smallBlindIndex].name}, BB -> ${table.players[bigBlindIndex].name}`);
+    postBlind(table.players[smallBlindIndex], table.smallBlindAmount, tableId);
+    //  ✅  Small Blind posts
+    postBlind(table.players[bigBlindIndex], table.bigBlindAmount, tableId, true);
+    //  ✅  Big Blind posts & updates `currentBet`
     table.currentPlayerIndex = (bigBlindIndex + 1) % table.players.length;
-    broadcastGameState(tableId);
-    bettingRound(tableId);
+    //  ✅  First action goes to UTG (next after BB)
+    table.playersWhoActed.clear();
+    console.log(` 🎯  First action: ${table.players[table.currentPlayerIndex].name}`);
+    broadcastGameState(tableId);  //  ✅  Ensures frontend gets the correct initial state
+    broadcast({
+        type: "blindsPosted",
+        smallBlind: table.players[smallBlindIndex].name,
+        bigBlind: table.players[bigBlindIndex].name
+    }, tableId);
+    setTimeout(bettingRound, 500, tableId); //  ✅  Start the first betting round
 }
+function formatHand(hand) {
+    return hand.map(card => `${card.rank} of ${card.suit}`).join(", "); 
+}
+function postBlind(player, amount, tableId, isBigBlind = false) {
+    const table = tables.get(tableId);
+    if (!table) return;
 
+    const blindAmount = Math.min(amount, player.tokens);
+    player.tokens -= blindAmount;
+    player.currentBet = blindAmount;
+    table.pot += blindAmount;
+    if (player.tokens === 0) {
+        player.allIn = true;
+    }
+    if (isBigBlind) {  //  ✅  Added: Ensure `currentBet` is set to the BB amount
+        table.currentBet = blindAmount;
+    }
+    console.log(` 💰  ${player.name} posts ${blindAmount}. Pot: ${table.pot}, Current Bet: ${table.currentBet}`);
+}
+function getNextPlayerIndex(currentIndex, tableId) {
+    const table = tables.get(tableId);
+    if (!table) return -1;
+
+    console.log(` 🔄  Finding next player from index ${currentIndex}`); 
+    let nextIndex = (currentIndex + 1) % table.players.length;
+    let attempts = 0;
+    while (attempts < table.players.length) {
+        let nextPlayer = table.players[nextIndex];
+        if (nextPlayer.status === "active" && nextPlayer.tokens > 0 && !nextPlayer.allIn) {
+            console.log(` 🎯  Next player is ${nextPlayer.name}`);
+            return nextIndex;
+        }
+        console.log(` ⏩  Skipping ${nextPlayer.name} (Status: ${nextPlayer.status}, Tokens: ${nextPlayer.tokens})`);
+        nextIndex = (nextIndex + 1) % table.players.length;
+        attempts++;
+    }
+    console.log(" ✅  All players have acted. Moving to the next round.");
+    setTimeout(nextRound, 1000, tableId);
+    return -1;
+}
 function bettingRound(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
+    console.log("Starting betting round..."); 
+
+    // ✅ Include all-in players in the current round
+    let activePlayers = table.players.filter(p => p.status === "active");
+    let nonAllInPlayers = table.players.filter(p => p.status === "active" && !p.allIn && p.tokens > 0);
+
+    if (nonAllInPlayers.length === 0 && activePlayers.length > 1) {
+        console.log("⚠️ Only all-in players remain. Betting round continues without them acting.");
+    } else if (nonAllInPlayers.length === 0) {
+    console.log("✅ No players left with chips. Skipping to next round.");
+    setTimeout(nextRound, 1000, tableId);
+    return;
+} else if (
+    nonAllInPlayers.length === 1 &&
+    table.playersWhoActed.has(nonAllInPlayers[0].name)
+) {
+    console.log("✅ Only one non-all-in player and they’ve acted. Moving to next round.");
+    setTimeout(nextRound, 1000, tableId);
+    return;
+}
+    
+
     if (isBettingRoundOver(tableId)) {
+        console.log("✅ All players have acted. Betting round is over.");
         setTimeout(nextRound, 1000, tableId);
         return;
     }
 
     const player = table.players[table.currentPlayerIndex];
-    if (!player || player.status !== "active" || player.allIn) {
-        table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
-        bettingRound(tableId);
-        return;
-    }
+if (table.playersWhoActed.has(player.name)) {
+        console.log(`${player.name} has already acted. Skipping...`);
+    table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
+    bettingRound(tableId);
+    return;
+}
+    
 
-    broadcast({ 
-        type: "playerTurn", 
-        playerName: player.name,
-        tableId: tableId,
-        minRaise: table.lastRaiseAmount || table.bigBlindAmount,
-        currentBet: table.currentBet
-    }, tableId);
+    console.log(`Waiting for player ${player.name} to act...`);
+    broadcast({ type: "playerTurn", playerName: player.name, tableId: tableId }, tableId);
 }
 
-function isBettingRoundOver(tableId) {
+unction isBettingRoundOver(tableId) {
     const table = tables.get(tableId);
     if (!table) return true;
 
-    const activePlayers = table.players.filter(p => 
+    console.log("📊 Checking if betting round is over...");
+    console.log("playersWhoActed:", [...table.playersWhoActed]);
+    console.log("Current Bet:", table.currentBet);
+    
+    // MODIFIED: Improved active player filtering
+    let activePlayers = table.players.filter(p => 
         p.status === "active" && !p.allIn && p.tokens > 0
     );
+    console.log("Active Players (non-all-in):", activePlayers.map(p => p.name));
 
-    // All players have acted
+    // MODIFIED: More accurate completion check
     const allActed = activePlayers.every(p => table.playersWhoActed.has(p.name));
-    
-    // All active players have matched the current bet or are all-in
     const allCalled = table.players.every(p => 
         p.status !== "active" || 
         p.allIn || 
         p.currentBet === table.currentBet
     );
 
+    console.log("✅ Betting round over:", allActed && allCalled);
     return (activePlayers.length === 0) || (allActed && allCalled);
 }
 
-function getNextPlayerIndex(currentIndex, tableId) {
-    const table = tables.get(tableId);
-    if (!table) return -1;
-
-    let nextIndex = (currentIndex + 1) % table.players.length;
-    let attempts = 0;
-
-    while (attempts < table.players.length) {
-        const player = table.players[nextIndex];
-        if (player.status === "active" && !player.allIn && player.tokens > 0) {
-            return nextIndex;
-        }
-        nextIndex = (nextIndex + 1) % table.players.length;
-        attempts++;
+// Function to deal a hand of cards to a player
+function dealHand(deck, numCards) {
+    const hand = [];
+    for (let i = 0; i < numCards; i++) {
+        hand.push(deck.pop());
+    } 
+    return hand;
+}
+// Function to shuffle the deck of cards
+function shuffleDeck(deck) {
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
     }
+    return deck;
+}
+function startFlopBetting(tableId) {
+    const table = tables.get(tableId);
+    if (!table) return;
 
-    return -1; // No valid players found
+    table.currentBet = 0; 
+    table.playersWhoActed.clear();
+
+    // ✅ Set the first active player left of the dealer
+    const nextIndex = getNextPlayerIndex(table.dealerIndex, tableId);
+    if (nextIndex !== -1) {
+        table.currentPlayerIndex = nextIndex;
+        console.log(` 🎯  Starting post-flop betting with: ${table.players[nextIndex].name}`);
+        broadcast({
+            type: "playerTurn",
+            playerName: table.players[nextIndex].name
+        }, tableId);
+    } else {
+        console.warn(`⚠️ No valid player to start betting with at table ${tableId}`);
+    }
 }
 
 function nextRound(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
+    console.log("nextRound() called. Current round:", table.round);
+    console.log("💬 Deck size:", table.deckForGame?.length);
+    console.log("💬 Pot:", table.pot);
+    console.log("💬 TableCards before dealing:", table.tableCards);
 
-    // Reset for new round
     table.currentBet = 0;
-    table.lastRaiseAmount = 0;
+    table.players.forEach(player => (player.currentBet = 0));
     table.playersWhoActed.clear();
-    table.players.forEach(p => p.currentBet = 0);
+    console.log(" 🆕  New round started. Reset playersWhoActed."); //  ✅  Debugging log
+    if (table.round === 0) {
+        table.round++; 
+        table.tableCards = manualFlop; // Set manual flop cards
 
-    // Deal community cards based on round
-    if (table.round === 0) { // Flop
-        table.round = 1;
-        table.tableCards = [
-            { suit: "Clubs", rank: "A" },
-            { suit: "Spades", rank: "7" },
-            { suit: "Clubs", rank: "2" }
-        ];
-        broadcast({ type: "message", text: `Flop: ${JSON.stringify(table.tableCards)}` }, tableId);
-    } 
-    else if (table.round === 1) { // Turn
-        table.round = 2;
-        table.tableCards.push({ suit: "Clubs", rank: "9" });
-        broadcast({ type: "message", text: `Turn: ${JSON.stringify(table.tableCards[3])}` }, tableId);
-    } 
-    else if (table.round === 2) { // River
-        table.round = 3;
-        table.tableCards.push({ suit: "Hearts", rank: "3" });
-        broadcast({ type: "message", text: `River: ${JSON.stringify(table.tableCards[4])}` }, tableId);
-    } 
-    else if (table.round === 3) { // Showdown
+        console.log("🃏 Flop dealt:", table.tableCards);
+        broadcast({ type: "message", text: `Flop: ${JSON.stringify(table.tableCards)}`, tableId: tableId }, tableId);
+    } else if (table.round === 1) {
+        table.round++;
+        table.tableCards.push(manualTurn); // Set manual turn card
+            // Turn
+            broadcast({ type: "message", text: `Turn: ${JSON.stringify(table.tableCards[3])}` , tableId: tableId }, tableId)
+        
+    } else if (table.round === 2) {
+        table.round++;
+                table.tableCards.push(manualRiver); // Set manual river card
+
+            // Turn
+            broadcast({ type: "message", text: `River: ${JSON.stringify(table.tableCards[4])}` ,tableId: tableId }, tableId);
+        }
+    else if (table.round === 3) {
         showdown(tableId);
         return;
     }
-
     broadcastGameState(tableId);
-    
-    // Start betting for this round
-    const nextPlayerIndex = getNextPlayerIndex(table.dealerIndex, tableId);
-    if (nextPlayerIndex !== -1) {
-        table.currentPlayerIndex = nextPlayerIndex;
-        setTimeout(() => bettingRound(tableId), 1500);
-    } else {
-        // No valid players, go directly to showdown
-        showdown(tableId);
-    }
+    setTimeout(() => startFlopBetting(tableId), 1500);
 }
+const manualFlop = [
+    { suit: "Clubs", rank: "A" },
+    { suit: "Spades", rank: "7" },
+    { suit: "Clubs", rank: "2" }
+];
+
+const manualTurn = { suit: "Clubs", rank: "9" };
+const manualRiver = { suit: "Hearts", rank: "3" };
 
 function showdown(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
-    const activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
-    const winners = determineWinners(activePlayers, table);
-
-    // Reveal winners' hands
-    const revealedHands = winners.map(winner => {
+    console.log(" 🏆  Showdown!");
+    let activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
+    let winners = determineWinners(activePlayers, table);
+    winners.forEach(winner => {
+        console.log(` 🎉  ${winner.name} wins the hand!`);
+    });
+    //  ✅  Automatically reveal the winner's hand
+        let revealedHands = winners.map(winner => {
         const fullHand = winner.hand.concat(table.tableCards);
-        const evalResult = evaluateHand(fullHand);
+        const evalResult = evaluateHand(fullHand); // ✅ Store the result first
+
         return {
             playerName: winner.name,
-            hand: evalResult.bestCards,
-            handType: evalResult.handType
+            hand: evalResult.bestCards, // ✅ Extract best cards
+            handType: evalResult.handType // ✅ Extract handType properly
         };
     });
-
-    // Distribute the pot
-    distributePot(tableId);
-
-    // Broadcast showdown info
+    //  ✅  Broadcast revealed winner hands to all players
     broadcast({
         type: "showdown",
         winners: revealedHands,
-        tableId: tableId
     }, tableId);
+    //  ✅  Record winning hand in history
+    broadcast({
+        type: "updateActionHistory",
+        action: `🏆  Winner: ${winners.map(w => w.name).join(", ")} with ${revealedHands[0].handType}`
+    }, tableId);
+    distributePot(tableId);
+    //  ✅  Give players the option to "Show" or "Hide" their hands
+    let remainingPlayers = activePlayers.filter(p => !winners.includes(p)).map(p => p.name);
+    if (remainingPlayers.length > 0) {
+        broadcast({
+            type: "showOrHideCards",
+            remainingPlayers
+        }, tableId);
+        //  ✅  Auto-start next hand if no action in 10 seconds
+        setTimeout(() => {
+            if (remainingPlayers.length > 0) {
+                console.log(" ⏳  No player responded. Automatically starting the next hand...");
+                resetGame(tableId);
+            }
 
-    // Start new hand after delay
-    setTimeout(() => resetGame(tableId), 5000);
+        }, 10000); // 10 seconds
+    } else {
+        setTimeout(resetGame, 5000, tableId);
+    }
 }
-
 function distributePot(tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
-    const activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
-    if (activePlayers.length === 0) return;
-
-    // Sort players by their total contribution (ascending)
+    console.log("💰 Distributing the pot...");
+    let activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
+    
+    // MODIFIED: Improved side pot logic starts here
     activePlayers.sort((a, b) => a.totalContribution - b.totalContribution);
-
     let lastContribution = 0;
     let remainingPot = table.pot;
 
-    // Create and distribute side pots
     for (let i = 0; i < activePlayers.length; i++) {
-        const currentPlayer = activePlayers[i];
-        const contributionDiff = currentPlayer.totalContribution - lastContribution;
+        let player = activePlayers[i];
+        let contributionDiff = player.totalContribution - lastContribution;
 
         if (contributionDiff > 0 && remainingPot > 0) {
-            // Players eligible for this portion of the pot
-            const eligiblePlayers = activePlayers.slice(i);
-            const potAmount = contributionDiff * eligiblePlayers.length;
+            let eligiblePlayers = activePlayers.slice(i);
+            let potAmount = contributionDiff * eligiblePlayers.length;
+            let distributeAmount = Math.min(potAmount, remainingPot);
 
-            // Determine winners for this portion
-            const winners = determineWinners(eligiblePlayers, table);
-            const winAmount = Math.floor(potAmount / winners.length);
+            if (distributeAmount > 0) {
+                let winners = determineWinners(eligiblePlayers, table);
+                let winAmount = Math.floor(distributeAmount / winners.length);
+                
+                winners.forEach(winner => {
+                    winner.tokens += winAmount;
+                    console.log(`🏆 ${winner.name} wins ${winAmount} from a side pot`);
+                });
 
-            // Distribute to winners
-            winners.forEach(winner => {
-                winner.tokens += winAmount;
-                console.log(`${winner.name} wins ${winAmount} from side pot`);
-            });
-
-            remainingPot -= potAmount;
-            lastContribution = currentPlayer.totalContribution;
+                remainingPot -= distributeAmount;
+                lastContribution = player.totalContribution;
+            }
         }
     }
 
-    // Distribute any remaining chips (due to rounding)
+    // MODIFIED: Handle remaining chips
     if (remainingPot > 0) {
-        const winners = determineWinners(activePlayers, table);
-        winners.forEach(winner => winner.tokens += 1);
+        let winners = determineWinners(activePlayers, table);
+        winners.forEach(winner => {
+            winner.tokens += 1;
+            remainingPot -= 1;
+        });
     }
+    // MODIFIED: Improved side pot logic ends here
+
+    // Original reset logic remains
+    table.pot = 0;
+    table.players.forEach(p => {
+        p.currentBet = 0;
+        p.totalContribution = 0; // MODIFIED: Reset contribution tracking
+    });
 }
 
-function determineWinners(players, table) {
-    if (players.length === 0) return [];
-    if (players.length === 1) return [players[0]]; // Single player wins by default
+
+function resetGame(tableId) {
+    const table = tables.get(tableId);
+    if (!table) return;
+
+    console.log("Resetting game for the next round.");
+    table.round = 0;
+    table.tableCards = [];
+    table.pot = 0;
+    let activePlayers = table.players.filter(p => p.tokens > 0); 
+    if (activePlayers.length > 0) {
+        table.dealerIndex = (table.dealerIndex + 1) % activePlayers.length;
+        console.log(` 🎲  New dealer is: ${activePlayers[table.dealerIndex].name}`);
+    } else {
+        console.log(" ⚠️ No active players left! Game cannot continue.");
+        return;
+    }
+    //  ✅  Reset all players for a new round
+    table.players.forEach(player => {
+        player.hand = [] ;
+        player.currentBet = 0;
+        player.allIn = false;
+                if (player.tokens > 0) {
+            player.status = "active"; // ✅ Can still play
+        } else {
+            player.status = "inactive"; // ✅ Out of chips, cannot play but stays at the table
+            console.log(` ❌ ${player.name} is out of chips and inactive.`);
+        }
+
+    });
+    console.log(` 🎲  New dealer is: ${table.players[table.dealerIndex].name}`);
+    startNewHand(tableId); //  ✅  Start the new round with correct dealer
+}
+function determineWinners(playerList, table) {
+    if (playerList.length === 0) return [];
 
     let bestHandValue = -1;
     let winners = [];
     let bestHand = null;
 
-    players.forEach(player => {
+    playerList.forEach(player => {
         if (player.status === "folded") return;
 
         const fullHand = player.hand.concat(table.tableCards);
-        const { handValue, bestCards, handType } = evaluateHand(fullHand);
+        const { handValue, bestCards, kicker, handType } = evaluateHand(fullHand);
+
+        console.log(`Player ${player.name} evaluated hand:`);
+        console.log(`Full Hand: ${JSON.stringify(fullHand.map(card => card.rank + card.suit))}`);
+        console.log(`Hand Type: ${handType}`);
+        console.log(`Hand Value: ${handValue}`);
+        console.log(`Best Cards: ${JSON.stringify(bestCards.map(card => card.rank + card.suit))}`);
+        console.log(`Kicker: ${kicker}`);
+
+        const comparison = bestHand
+            ? compareHands(bestCards, bestHand)
+            : 1;
 
         if (handValue > bestHandValue) {
             winners = [player];
             bestHandValue = handValue;
             bestHand = bestCards;
-        } 
-        else if (handValue === bestHandValue) {
-            const comparison = compareHands(bestCards, bestHand);
+            console.log(`New best hand found for ${player.name}: ${handType}`);
+        } else if (handValue === bestHandValue) {
             if (comparison > 0) {
                 winners = [player];
                 bestHand = bestCards;
-            } 
-            else if (comparison === 0) {
+                console.log(`New better kicker found for ${player.name}.`);
+            } else if (comparison === 0) {
                 winners.push(player);
+                console.log(`Tie detected, adding ${player.name} as a winner.`);
             }
         }
     });
 
     return winners;
 }
-
 
 // Function to evaluate the hand of a player
 function evaluateHand(cards) {
@@ -755,15 +896,18 @@ function handleRaise(data, tableId) {
     if (!player) return;
     
     let raiseAmount = parseInt(data.amount);
-    if (raiseAmount > player.tokens) raiseAmount = player.tokens; // All-in scenario
-    
+    // MODIFIED: Enforce minimum raise unless going all-in
+    const minRaise = table.lastRaiseAmount || table.bigBlindAmount;
+    if (raiseAmount < minRaise && raiseAmount !== player.tokens) {
+        console.log(`❌ ${player.name} must raise by at least ${minRaise}`);
+        return;
+    }
+
     const totalBet = player.currentBet + raiseAmount;
     player.tokens -= raiseAmount;
     table.pot += raiseAmount;
     player.currentBet = totalBet;
-    player.totalContribution += raiseAmount;
-table.pot += raiseAmount;
-player.currentBet = totalBet;
+    player.totalContribution += raiseAmount; // MODIFIED: Track total contribution
     
     if (player.tokens === 0) {
         player.allIn = true;
@@ -771,32 +915,21 @@ player.currentBet = totalBet;
     
     console.log(`${player.name} raises to ${totalBet}`);
     
-    // Handle side pot creation
-    const maxEffectiveStack = Math.min(...table.players.map(p => p.currentBet));
-    table.sidePots = table.sidePots || [];
-    if (totalBet > maxEffectiveStack) {
-        console.log(`${player.name} raised beyond the effective stack, creating a side pot`);
-        table.sidePots.push({
-            amount: totalBet - maxEffectiveStack,
-            eligiblePlayers: table.players.filter(p => p.currentBet >= totalBet)
-        });
-    }
-    
+    // Original broadcast and logging remains
     table.currentBet = totalBet;
-    table.playersWhoActed.clear(); // Reset for new round
+    table.lastRaiseAmount = raiseAmount; // MODIFIED: Track last raise amount
+    table.playersWhoActed.clear();
     table.playersWhoActed.add(player.name);
     
     broadcast({
         type: "updateActionHistory",
         action: `${data.playerName} raised to ${totalBet}`
     }, tableId);
-    broadcast({ type: "raise", playerName: data.playerName, amount: totalBet, tableId: tableId }, tableId);
     
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
     broadcastGameState(tableId);
     bettingRound(tableId);
 }
-
 
 function handleBet(data, tableId) {
 const table = tables.get(tableId);
@@ -838,120 +971,110 @@ if (betAmount <= player.tokens && betAmount > table.currentBet) {
     bettingRound(tableId);
 }
 }
-function handleRaise(data, tableId) {
-    const table = tables.get(tableId);
-    if (!table) return;
-
-    const player = table.players.find(p => p.name === data.playerName);
-    if (!player || player.status !== "active") return;
-
-    const raiseAmount = parseInt(data.amount);
-    const minRaise = table.lastRaiseAmount || table.bigBlindAmount;
-
-    if (raiseAmount < minRaise && raiseAmount !== player.tokens) {
-        console.log(`Invalid raise amount ${raiseAmount}, minimum is ${minRaise}`);
-        return;
-    }
-
-    const totalBet = player.currentBet + raiseAmount;
-    player.tokens -= raiseAmount;
-    player.currentBet = totalBet;
-    player.totalContribution += raiseAmount;
-    table.pot += raiseAmount;
-    table.currentBet = totalBet;
-    table.lastRaiseAmount = raiseAmount;
-    table.playersWhoActed.clear(); // Reset for new betting round
-    table.playersWhoActed.add(player.name);
-
-    if (player.tokens === 0) player.allIn = true;
-
-    broadcast({
-        type: "updateActionHistory",
-        action: `${player.name} raised to ${totalBet}`,
-        tableId: tableId
-    }, tableId);
-
-    table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
-    broadcastGameState(tableId);
-    bettingRound(tableId);
-}
-
 function handleCall(data, tableId) {
     const table = tables.get(tableId);
     if (!table) return;
 
+    console.log(`🔄 ${data.playerName} performed action: ${data.type}`);
+    console.log("Before updating playersWhoActed:", [...table.playersWhoActed]);
+
     const player = table.players.find(p => p.name === data.playerName);
-    if (!player || player.status !== "active") return;
+    if (!player) {
+        console.error("Player not found:", data.playerName);
+        return;
+    }
 
     const callAmount = table.currentBet - player.currentBet;
-    const actualCall = Math.min(callAmount, player.tokens);
+    // MODIFIED: Better all-in handling
+    if (callAmount >= player.tokens) {
+        // Player goes all-in
+        player.allIn = true;
+        const allInAmount = player.tokens;
+        player.tokens = 0;
+        player.currentBet += allInAmount;
+        player.totalContribution += allInAmount;
+        table.pot += allInAmount;
+        console.log(`💥 ${player.name} goes all-in for ${allInAmount}`);
+    } else {
+        // Normal call
+        player.tokens -= callAmount;
+        player.currentBet = table.currentBet;
+        player.totalContribution += callAmount;
+        table.pot += callAmount;
+    }
 
-    player.tokens -= actualCall;
-    player.currentBet += actualCall;
-    player.totalContribution += actualCall;
-    table.pot += actualCall;
+    // Original logging and broadcast remains
     table.playersWhoActed.add(player.name);
-
-    if (player.tokens === 0) player.allIn = true;
+    console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
 
     broadcast({
         type: "updateActionHistory",
-        action: `${player.name} called ${actualCall}`,
-        tableId: tableId
+        action: `${data.playerName} called ${Math.min(callAmount, player.tokens + callAmount)}`
     }, tableId);
 
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
+    if (table.currentPlayerIndex !== -1) {
+        bettingRound(tableId);
+    } else {
+        console.log("✅ All players have acted. Moving to next round.");
+        setTimeout(nextRound, 1000, tableId);
+    }
     broadcastGameState(tableId);
-    bettingRound(tableId);
 }
 
 function handleFold(data, tableId) {
-    const table = tables.get(tableId);
-    if (!table) return;
+const table = tables.get(tableId);
+if (!table) return;
 
-    const player = table.players.find(p => p.name === data.playerName);
-    if (!player || player.status !== "active") return;
-
-    player.status = "folded";
-    table.playersWhoActed.add(player.name);
-
-    broadcast({
-        type: "updateActionHistory",
-        action: `${player.name} folded`,
-        tableId: tableId
-    }, tableId);
-
-    // Check if only one player remains
-    const activePlayers = table.players.filter(p => p.status === "active");
+console.log(` 🔄  ${data.playerName} performed action: ${data.type}`);
+console.log("Before updating playersWhoActed:", [...table.playersWhoActed]);
+const player = table.players.find(p => p.name === data.playerName);
+if (!player) {
+    console.error("Player not found:", data.playerName);
+    return; //  ✅  Prevents processing an invalid action
+}
+player.status = "folded";
+table.playersWhoActed.add(player.name);
+console.log(` ❌  ${player.name} folded.`);
+broadcast({
+    type: "updateActionHistory",
+    action: `${data.playerName} folded`
+}, tableId);
+broadcast({ type: "fold", playerName: data.playerName , tableId: tableId }, tableId);
+    let activePlayers = table.players.filter(p => p.status === "active");
     if (activePlayers.length === 1) {
+        console.log(` 🏆  Only one player remains: ${activePlayers[0].name}. Going to showdown.`);
         showdown(tableId);
         return;
     }
-
-    table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
-    broadcastGameState(tableId);
+table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
+if (table.currentPlayerIndex !== -1) {
     bettingRound(tableId);
+} else {
+    console.log(" ✅  All players have acted. Moving to next round.");
+    setTimeout(nextRound, 1000, tableId);
 }
-
+broadcastGameState(tableId);  //  ✅  Only update the UI once
+}
 function handleCheck(data, tableId) {
-    const table = tables.get(tableId);
-    if (!table) return;
+const table = tables.get(tableId);
+if (!table) return;
 
-    const player = table.players.find(p => p.name === data.playerName);
-    if (!player || player.status !== "active") return;
-
-    if (player.currentBet < table.currentBet) {
-        console.log("Cannot check when there's a bet");
-        return;
-    }
-
+console.log(` 🔄  ${data.playerName} performed action: ${data.type}`);
+console.log("Before updating playersWhoActed:", [...table.playersWhoActed]);
+const player = table.players.find(p => p.name === data.playerName);
+if (!player) {
+    console.error(" ❌  Player not found:", data.playerName);
+    return; //  ✅  Prevents processing an invalid action
+}
+if (table.currentBet === 0 || player.currentBet === table.currentBet) {
+    console.log(`${player.name} checked.`);
     table.playersWhoActed.add(player.name);
+    console.log("After updating playersWhoActed:", [...table.playersWhoActed]);
     broadcast({
         type: "updateActionHistory",
-        action: `${player.name} checked`,
-        tableId: tableId
+        action: `${data.playerName} checked`
     }, tableId);
-
     if (isBettingRoundOver(tableId)) {
         setTimeout(nextRound, 1000, tableId);
     } else {
@@ -960,61 +1083,8 @@ function handleCheck(data, tableId) {
         bettingRound(tableId);
     }
 }
-
-function handleShowHide(data, tableId) {
-    const table = tables.get(tableId);
-    if (!table) return;
-
-    const player = table.players.find(p => p.name === data.playerName);
-    if (!player) return;
-
-    broadcast({
-        type: "updateActionHistory",
-        action: data.choice === "show" ? 
-            `${player.name} showed their hand` :
-            `${player.name} hid their hand`,
-        tableId: tableId
-    }, tableId);
 }
-
-function handlePlayerReady(data, tableId) {
-    const table = tables.get(tableId);
-    if (!table) return;
-
-    const player = table.players.find(p => p.name === data.playerName);
-    if (player) player.isReady = true;
-
-    // Start new hand if all ready
-    if (table.players.every(p => p.isReady || p.tokens <= 0)) {
-        startNewHand(tableId);
-    }
-}
-
-function resetGame(tableId) {
-    const table = tables.get(tableId);
-    if (!table) return;
-
-    // Reset player states
-    table.players.forEach(player => {
-        player.hand = [];
-        player.currentBet = 0;
-        player.totalContribution = 0;
-        player.allIn = false;
-        player.isReady = false;
-        if (player.tokens > 0) {
-            player.status = "active";
-        } else {
-            player.status = "inactive";
-        }
-    });
-
-    // Start new hand
-    startNewHand(tableId);
-}
-
-// Start server
+// Start the server
 server.listen(process.env.PORT || 8080, () => {
-    console.log(`Server started on port ${server.address().port}`);
+console.log(`WebSocket server started on port ${server.address().port}`);
 });
-
-
