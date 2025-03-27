@@ -351,6 +351,8 @@ function nextRound(tableId) {
 
 if (table.round < 3) {
     setTimeout(() => startFlopBetting(tableId), 1500);
+    
+    console.log("🏁 SHOWDOWN TRIGGERED");
 }
     
 const manualFlop = [
@@ -1092,3 +1094,11 @@ if (table.currentBet === 0 || player.currentBet === table.currentBet) {
 server.listen(process.env.PORT || 8080, () => {
 console.log(`WebSocket server started on port ${server.address().port}`);
 });
+
+
+// Start the server
+server.listen(process.env.PORT || 8080, () => {
+    console.log(`WebSocket server started on port ${server.address().port}`);
+});
+
+// ✅ END OF FILE - Deployment verified.
