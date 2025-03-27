@@ -399,58 +399,67 @@ function distributePot(tableId) {
 
     console.log("💰 Distributing the pot...");
 
-    // Only players who didn't fold are eligible
     const playersInHand = table.players.filter(p => p.status !== "folded");
 
-    // Cache hand evaluations
     const handStrengthMap = new Map();
     playersInHand.forEach(p => {
         const fullHand = p.hand.concat(table.tableCards);
         handStrengthMap.set(p.name, evaluateHand(fullHand));
     });
 
-    // Sort players by contribution (ascending)
-    const sorted = [...playersInHand].sort((a, b) => a.totalContribution - b.totalContribution);
-    const contributionLevels = [...new Set(sorted.map(p => p.totalContribution))];
+    const anyAllIn = playersInHand.some(p => p.allIn);
 
-    let totalPot = table.pot;
-    let remainingPlayers = [...playersInHand];
-    let lastLevel = 0;
-
-    for (const level of contributionLevels) {
-        // Eligible players: contributed >= this level
-        const eligible = remainingPlayers.filter(p => p.totalContribution >= level);
-
-        const levelAmount = (level - lastLevel) * eligible.length;
-
-        // Track and verify correct pot distribution
-        totalPot -= levelAmount;
-        lastLevel = level;
-
-        console.log(`💡 Side Pot Level ${level}: ${levelAmount} chips between ${eligible.map(p => p.name).join(", ")}`);
-
-        const winners = determineWinners(eligible, table, handStrengthMap);
-        const baseShare = Math.floor(levelAmount / winners.length);
-        let remainder = levelAmount % winners.length;
+    // ✅ CASE 1: No all-ins, single pot
+    if (!anyAllIn) {
+        const winners = determineWinners(playersInHand, table, handStrengthMap);
+        const baseShare = Math.floor(table.pot / winners.length);
+        let remainder = table.pot % winners.length;
 
         winners.forEach((winner, i) => {
             const winAmount = baseShare + (i < remainder ? 1 : 0);
             winner.tokens += winAmount;
-            console.log(`🏆 ${winner.name} wins ${winAmount} from side pot level ${level}`);
+            console.log(`🏆 ${winner.name} wins ${winAmount} from main pot`);
         });
 
-        // Remove players who are no longer in remaining levels
-        remainingPlayers = remainingPlayers.filter(p => p.totalContribution > level);
+    } else {
+        // ✅ CASE 2: Side pot logic needed
+        const sorted = [...playersInHand].sort((a, b) => a.totalContribution - b.totalContribution);
+        const contributionLevels = [...new Set(sorted.map(p => p.totalContribution))];
+
+        let totalPot = table.pot;
+        let remainingPlayers = [...playersInHand];
+        let lastLevel = 0;
+
+        for (const level of contributionLevels) {
+            const eligible = remainingPlayers.filter(p => p.totalContribution >= level);
+            const levelAmount = (level - lastLevel) * eligible.length;
+
+            totalPot -= levelAmount;
+            lastLevel = level;
+
+            console.log(`💡 Side Pot Level ${level}: ${levelAmount} chips between ${eligible.map(p => p.name).join(", ")}`);
+
+            const winners = determineWinners(eligible, table, handStrengthMap);
+            const baseShare = Math.floor(levelAmount / winners.length);
+            let remainder = levelAmount % winners.length;
+
+            winners.forEach((winner, i) => {
+                const winAmount = baseShare + (i < remainder ? 1 : 0);
+                winner.tokens += winAmount;
+                console.log(`🏆 ${winner.name} wins ${winAmount} from side pot level ${level}`);
+            });
+
+            remainingPlayers = remainingPlayers.filter(p => p.totalContribution > level);
+        }
     }
 
-    // Final cleanup
+    // ✅ Reset pot and contributions
     table.pot = 0;
     table.players.forEach(p => {
         p.currentBet = 0;
         p.totalContribution = 0;
     });
 }
-
 
 function resetGame(tableId) {
     const table = tables.get(tableId);
