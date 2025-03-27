@@ -88,65 +88,66 @@ function startGame(tableId) {
     broadcastGameState(tableId); 
 }
 // Function to start a new hand
-function startNewHand(tableId) {
-    const table = tables.get(tableId);
-    if (!table) return;
+function startNewHand(table) {
+  table.resetForNewHand();
 
-    // Reset key values manually
-    table.deck = shuffle(createDeck());
-    table.pot = 0;
-    table.currentBet = 0;
-    table.lastRaiseAmount = table.bigBlindAmount;
-    table.round = 0;
-    table.tableCards = [];
-    table.playersWhoActed = new Set();
+  // Shuffle the deck and deal two cards to each player
+  const deck = createShuffledDeck();
+  table.deck = deck;
+  for (let player of table.players) {
+    player.hand = [deck.pop(), deck.pop()];
+    player.folded = false;
+    player.allIn = false;
+    player.currentBet = 0;
+    player.totalContribution = 0;
+    player.status = 'active';
+  }
 
-    // Move dealer button
-    table.dealerIndex = getNextActivePlayerIndex(table.dealerIndex, tableId);
+  table.currentBet = 0;
+  table.pot = 0;
+  table.sidePots = [];
+  table.tableCards = [];
+  table.round = 0;
+  table.playersWhoActed = new Set();
 
-    // Reset player states and deal cards
-    for (const player of table.players) {
-        player.hand = [table.deck.pop(), table.deck.pop()];
-        player.currentBet = 0;
-        player.totalContribution = 0;
-        player.folded = false;
-        player.allIn = false;
-    }
+  // Rotate dealer
+  table.dealerIndex = (table.dealerIndex + 1) % table.players.length;
+  const smallBlindIndex = (table.dealerIndex + 1) % table.players.length;
+  const bigBlindIndex = (table.dealerIndex + 2) % table.players.length;
 
-    // Assign small and big blinds
-    const smallBlindIndex = getNextActivePlayerIndex(table.dealerIndex, tableId);
-    const bigBlindIndex = getNextActivePlayerIndex(smallBlindIndex, tableId);
+  const smallBlindPlayer = table.players[smallBlindIndex];
+  const bigBlindPlayer = table.players[bigBlindIndex];
 
-    const sbPlayer = table.players[smallBlindIndex];
-    const bbPlayer = table.players[bigBlindIndex];
+  const smallBlind = table.smallBlind;
+  const bigBlind = table.bigBlind;
 
-    const sbAmount = Math.min(table.smallBlindAmount, sbPlayer.tokens);
-    const bbAmount = Math.min(table.bigBlindAmount, bbPlayer.tokens);
+  // Post small blind
+  smallBlindPlayer.tokens -= smallBlind;
+  smallBlindPlayer.currentBet = smallBlind;
+  smallBlindPlayer.totalContribution = smallBlind;
+  table.playersWhoActed.add(smallBlindPlayer.name);
 
-    sbPlayer.tokens -= sbAmount;
-    sbPlayer.currentBet = sbAmount;
-    sbPlayer.totalContribution = sbAmount;
+  // Post big blind
+  bigBlindPlayer.tokens -= bigBlind;
+  bigBlindPlayer.currentBet = bigBlind;
+  bigBlindPlayer.totalContribution = bigBlind;
+  table.playersWhoActed.add(bigBlindPlayer.name);
 
-    bbPlayer.tokens -= bbAmount;
-    bbPlayer.currentBet = bbAmount;
-    bbPlayer.totalContribution = bbAmount;
+  table.currentBet = bigBlind;
 
-    table.pot = sbAmount + bbAmount;
-    table.currentBet = bbAmount;
+  broadcast(table, {
+    type: 'handStarted',
+    dealer: table.players[table.dealerIndex].name,
+    smallBlind: smallBlindPlayer.name,
+    bigBlind: bigBlindPlayer.name,
+    players: table.players.map((p) => ({
+      name: p.name,
+      tokens: p.tokens,
+    })),
+  });
 
-    // Blinds are considered to have acted
-    if (sbAmount > 0) table.playersWhoActed.add(sbPlayer.name);
-    if (bbAmount > 0) table.playersWhoActed.add(bbPlayer.name);
-
-    // Set action to first player after BB
-    table.currentPlayerIndex = getNextActivePlayerIndex(bigBlindIndex, tableId);
-
-    console.log(`🎲 New dealer is: ${table.players[table.dealerIndex].name}`);
-    console.log(`💰 Blinds posted: SB ${sbPlayer.name} (${sbAmount}), BB ${bbPlayer.name} (${bbAmount})`);
-    console.log(`🎯 Starting action with: ${table.players[table.currentPlayerIndex].name}`);
-
-    broadcastGameState(tableId);
-    bettingRound(tableId);
+  dealToPlayers(table);
+  startBettingRound(table, (bigBlindIndex + 1) % table.players.length);
 }
 
 function setupBlinds(tableId) {
