@@ -415,26 +415,28 @@ function distributePot(tableId) {
     if (!table) return;
 
     console.log("💰 Distributing the pot...");
-    let players = table.players.filter(p => p.status === "active" || p.allIn);
+    const players = table.players.filter(p => p.status === "active" || p.allIn);
 
-    // ✅ Evaluate hands once and cache
+    // ✅ Evaluate hands once and store results
     const handStrengthMap = new Map();
     players.forEach(p => {
         const fullHand = p.hand.concat(table.tableCards);
         handStrengthMap.set(p.name, evaluateHand(fullHand));
     });
 
-    // ✅ Sort players by their contribution size
+    // ✅ Sort players by total contribution (ascending)
     players.sort((a, b) => a.totalContribution - b.totalContribution);
-    let sidePotLevels = [...new Set(players.map(p => p.totalContribution))].sort((a, b) => a - b);
+    const sidePotLevels = [...new Set(players.map(p => p.totalContribution))].sort((a, b) => a - b);
 
     let lastLevel = 0;
     let remainingPot = table.pot;
+    let finalEligiblePlayers = [];
 
     for (let level of sidePotLevels) {
-        let eligiblePlayers = players.filter(p => p.totalContribution >= level);
-        let potSize = (level - lastLevel) * eligiblePlayers.length;
-        let distributeAmount = Math.min(potSize, remainingPot);
+        const eligiblePlayers = players.filter(p => p.totalContribution >= level);
+        finalEligiblePlayers = eligiblePlayers; // ✅ Track the final tier for leftover distribution
+        const potSize = (level - lastLevel) * eligiblePlayers.length;
+        const distributeAmount = Math.min(potSize, remainingPot);
 
         const winners = determineWinners(eligiblePlayers, table, handStrengthMap);
         const winAmount = Math.floor(distributeAmount / winners.length);
@@ -448,17 +450,17 @@ function distributePot(tableId) {
         lastLevel = level;
     }
 
-    // ✅ Distribute leftover chips (if any) to final winners
-    if (remainingPot > 0) {
-        const finalWinners = determineWinners(players, table, handStrengthMap);
-        for (let winner of finalWinners) {
+    // ✅ Distribute leftover chips (due to rounding) to last eligible winners only
+    if (remainingPot > 0 && finalEligiblePlayers.length > 0) {
+        const lastWinners = determineWinners(finalEligiblePlayers, table, handStrengthMap);
+        for (const winner of lastWinners) {
             if (remainingPot <= 0) break;
             winner.tokens += 1;
             remainingPot -= 1;
         }
     }
 
-    // ✅ Reset pot & contributions
+    // ✅ Reset pot and contributions
     table.pot = 0;
     table.players.forEach(p => {
         p.currentBet = 0;
