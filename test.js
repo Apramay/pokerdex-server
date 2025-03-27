@@ -415,53 +415,55 @@ function distributePot(tableId) {
     if (!table) return;
 
     console.log("💰 Distributing the pot...");
-    const players = table.players.filter(p => p.status === "active" || p.allIn);
+    const players = table.players.filter(p => p.status !== "folded");
 
-    // Evaluate hands once
+    // Sort players by their totalContribution (ascending)
+    players.sort((a, b) => a.totalContribution - b.totalContribution);
+    
     const handStrengthMap = new Map();
     players.forEach(p => {
         const fullHand = p.hand.concat(table.tableCards);
         handStrengthMap.set(p.name, evaluateHand(fullHand));
     });
 
-    // Sort players by contribution
-    players.sort((a, b) => a.totalContribution - b.totalContribution);
-    const uniqueLevels = [...new Set(players.map(p => p.totalContribution))].sort((a, b) => a - b);
+    let sidePots = [];
+    let lastContribution = 0;
+    let remainingPlayers = [...players];
 
-    let lastLevel = 0;
-    let remainingPot = table.pot;
+    while (remainingPlayers.length > 0) {
+        const minContribution = remainingPlayers[0].totalContribution;
 
-    for (let level of uniqueLevels) {
-        const eligiblePlayers = players.filter(p => p.totalContribution >= level);
-        const potSize = (level - lastLevel) * eligiblePlayers.length;
+        const eligible = [...remainingPlayers];
+        const potSize = (minContribution - lastContribution) * eligible.length;
 
-        const actualPot = Math.min(remainingPot, potSize);
-        remainingPot -= actualPot;
+        sidePots.push({ amount: potSize, players: eligible });
 
-        // Determine winner(s) among eligible players
-        const winners = determineWinners(eligiblePlayers, table, handStrengthMap);
-
-        // Calculate even share + leftovers
-        const baseAmount = Math.floor(actualPot / winners.length);
-        let leftover = actualPot % winners.length;
-
-        // Distribute pot
-        winners.forEach((winner, i) => {
-            const share = baseAmount + (i < leftover ? 1 : 0);
-            winner.tokens += share;
-            console.log(`🏆 ${winner.name} wins ${share} from a side pot`);
-        });
-
-        lastLevel = level;
+        lastContribution = minContribution;
+        remainingPlayers = remainingPlayers.filter(p => p.totalContribution > lastContribution);
     }
 
-    // Cleanup
+    // Distribute each side pot
+    for (let { amount, players: potPlayers } of sidePots) {
+        const winners = determineWinners(potPlayers, table, handStrengthMap);
+
+        const share = Math.floor(amount / winners.length);
+        let leftover = amount % winners.length;
+
+        winners.forEach((winner, i) => {
+            const payout = share + (i < leftover ? 1 : 0);
+            winner.tokens += payout;
+            console.log(`🏆 ${winner.name} wins ${payout} from a side pot`);
+        });
+    }
+
+    // Reset
     table.pot = 0;
     table.players.forEach(p => {
-        p.currentBet = 0;
         p.totalContribution = 0;
+        p.currentBet = 0;
     });
 }
+
 
 function resetGame(tableId) {
     const table = tables.get(tableId);
