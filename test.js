@@ -415,54 +415,46 @@ function distributePot(tableId) {
     if (!table) return;
 
     console.log("💰 Distributing the pot...");
-    let activePlayers = table.players.filter(p => p.status === "active" || p.allIn);
-    
-    // MODIFIED: Improved side pot logic starts here
-    activePlayers.sort((a, b) => a.totalContribution - b.totalContribution);
-    let lastContribution = 0;
+    let players = table.players.filter(p => p.status === "active" || p.allIn);
+    players.sort((a, b) => a.totalContribution - b.totalContribution);
+
+    let sidePotLevels = [...new Set(players.map(p => p.totalContribution))].sort((a, b) => a - b);
+    let lastLevel = 0;
     let remainingPot = table.pot;
 
-    for (let i = 0; i < activePlayers.length; i++) {
-        let player = activePlayers[i];
-        let contributionDiff = player.totalContribution - lastContribution;
+    for (let level of sidePotLevels) {
+        let eligiblePlayers = players.filter(p => p.totalContribution >= level);
+        let potSize = (level - lastLevel) * eligiblePlayers.length;
+        let distributeAmount = Math.min(potSize, remainingPot);
+        let winners = determineWinners(eligiblePlayers, table);
+        let winAmount = Math.floor(distributeAmount / winners.length);
 
-        if (contributionDiff > 0 && remainingPot > 0) {
-            let eligiblePlayers = activePlayers.slice(i);
-            let potAmount = contributionDiff * eligiblePlayers.length;
-            let distributeAmount = Math.min(potAmount, remainingPot);
+        winners.forEach(winner => {
+            winner.tokens += winAmount;
+            console.log(`🏆 ${winner.name} wins ${winAmount} from a side pot`);
+        });
 
-            if (distributeAmount > 0) {
-                let winners = determineWinners(eligiblePlayers, table);
-                let winAmount = Math.floor(distributeAmount / winners.length);
-                
-                winners.forEach(winner => {
-                    winner.tokens += winAmount;
-                    console.log(`🏆 ${winner.name} wins ${winAmount} from a side pot`);
-                });
-
-                remainingPot -= distributeAmount;
-                lastContribution = player.totalContribution;
-            }
-        }
+        remainingPot -= distributeAmount;
+        lastLevel = level;
     }
 
-    // MODIFIED: Handle remaining chips
+    // Distribute any leftover chips (due to floor rounding) to top winner(s)
     if (remainingPot > 0) {
-        let winners = determineWinners(activePlayers, table);
-        winners.forEach(winner => {
+        let finalWinners = determineWinners(players, table);
+        finalWinners.forEach(winner => {
             winner.tokens += 1;
             remainingPot -= 1;
+            if (remainingPot <= 0) return;
         });
     }
-    // MODIFIED: Improved side pot logic ends here
 
-    // Original reset logic remains
     table.pot = 0;
     table.players.forEach(p => {
         p.currentBet = 0;
-        p.totalContribution = 0; // MODIFIED: Reset contribution tracking
+        p.totalContribution = 0;
     });
 }
+
 
 
 function resetGame(tableId) {
