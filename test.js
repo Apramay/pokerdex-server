@@ -998,6 +998,20 @@ function handleCall(data, tableId) {
         action: `${data.playerName} called ${chipsToAdd}`
     }, tableId);
 
+    // ✅ Check if all non-folded players are all-in or have no chips
+    const nonFolded = table.players.filter(p => p.status === "active" || p.allIn);
+    const allAllIn = nonFolded.every(p => p.allIn || p.tokens === 0);
+
+    if (allAllIn && table.round >= 2) {
+        console.log("💥 All players are all-in — dealing remaining cards and going to showdown...");
+        while (table.round < 3) {
+            nextRound(tableId);
+        }
+        showdown(tableId);
+        return;
+    }
+
+    // Continue normal flow
     table.currentPlayerIndex = getNextPlayerIndex(table.currentPlayerIndex, tableId);
     if (table.currentPlayerIndex !== -1) {
         bettingRound(tableId);
@@ -1008,7 +1022,6 @@ function handleCall(data, tableId) {
 
     broadcastGameState(tableId);
 }
-
 
 function handleFold(data, tableId) {
 const table = tables.get(tableId);
