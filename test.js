@@ -124,7 +124,7 @@ if (player.name === "A") {
     } else {
         player.hand = player.tokens > 0 ? dealHand(table.deckForGame, 2) : [];
     }        player.currentBet = 0;
-        player.totalContribution = 0; // ✅ ADD THIS LINE
+        player.totalContribution = 0; // ✅ IMPORTANT
         player.status = player.tokens > 0 ? "active" : "inactive";
         player.isSmallBlind = (activePlayers[smallBlindIndex] && player.name === activePlayers[smallBlindIndex].name);
         player.isBigBlind = (activePlayers[bigBlindIndex] && player.name === activePlayers[bigBlindIndex].name);
@@ -348,13 +348,8 @@ function nextRound(tableId) {
         return;
     }
     broadcastGameState(tableId);
-
-if (table.round < 3) {
     setTimeout(() => startFlopBetting(tableId), 1500);
-    
-    console.log("🏁 SHOWDOWN TRIGGERED");
 }
-    
 const manualFlop = [
     { suit: "Clubs", rank: "A" },
     { suit: "Spades", rank: "7" },
@@ -1094,11 +1089,3 @@ if (table.currentBet === 0 || player.currentBet === table.currentBet) {
 server.listen(process.env.PORT || 8080, () => {
 console.log(`WebSocket server started on port ${server.address().port}`);
 });
-
-
-// Start the server
-server.listen(process.env.PORT || 8080, () => {
-    console.log(`WebSocket server started on port ${server.address().port}`);
-});
-
-// ✅ END OF FILE - Deployment verified.
