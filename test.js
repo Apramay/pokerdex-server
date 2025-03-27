@@ -351,8 +351,6 @@ function nextRound(tableId) {
 
 if (table.round < 3) {
     setTimeout(() => startFlopBetting(tableId), 1500);
-    
-    console.log("🏁 SHOWDOWN TRIGGERED");
 }
     
 const manualFlop = [
