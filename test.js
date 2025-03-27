@@ -248,7 +248,7 @@ if (table.playersWhoActed.has(player.name)) {
     broadcast({ type: "playerTurn", playerName: player.name, tableId: tableId }, tableId);
 }
 
-unction isBettingRoundOver(tableId) {
+function isBettingRoundOver(tableId) {
     const table = tables.get(tableId);
     if (!table) return true;
 
